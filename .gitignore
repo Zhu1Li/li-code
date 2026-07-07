@@ -1,0 +1,56 @@
+# Build output
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### IntelliJ IDEA ###
+.idea/
+!.idea/.gitignore
+dependency-reduced-pom.xml
+*.iws
+*.iml
+*.ipr
+
+### Eclipse ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+### Mac OS ###
+.DS_Store
+
+### Runtime state / local config (never publish) ###
+.licode/*
+!.licode/config.example.yaml
+.claude/
+CLAUDE.md
+claudeWorkSpace.npm-cache/
+
+### Python (harbor eval harness) ###
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+### Docs: publish architecture diagram only; keep internal planning / notes / reference material private ###
+docs/ch*/
+docs/*_mewcode.md
+docs/notes/

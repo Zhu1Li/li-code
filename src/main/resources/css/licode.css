@@ -1,0 +1,485 @@
+.root {
+    -fx-background-color: #1e1e2e;
+}
+
+.scroll-pane {
+    -fx-background: #1e1e2e;
+    -fx-background-color: #1e1e2e;
+    -fx-border-color: transparent;
+}
+
+.scroll-pane .viewport {
+    -fx-background-color: #1e1e2e;
+}
+
+.scroll-pane .scroll-bar:vertical {
+    -fx-background-color: #1e1e2e;
+}
+
+.scroll-pane .scroll-bar:vertical .thumb {
+    -fx-background-color: #45475a;
+    -fx-background-radius: 4;
+}
+
+/* Chat bubbles */
+.chat-bubble-user {
+    -fx-background-color: #45475a;
+    -fx-background-radius: 8 8 0 8;
+    -fx-padding: 10 14 10 14;
+}
+
+.chat-bubble-assistant {
+    -fx-background-color: transparent;
+    -fx-padding: 4 14 4 14;
+}
+
+.chat-bubble-tool {
+    -fx-background-color: rgba(249, 226, 175, 0.08);
+    -fx-background-radius: 4;
+    -fx-padding: 6 10 6 10;
+    -fx-border-color: #f9e2af;
+    -fx-border-width: 0 0 0 2;
+}
+
+.text-tool {
+    -fx-fill: #f9e2af;
+    -fx-font-size: 13px;
+}
+
+.chat-bubble-system {
+    -fx-background-color: transparent;
+    -fx-padding: 2 14 2 14;
+}
+
+.chat-bubble-error {
+    -fx-background-color: #f38ba8;
+    -fx-background-radius: 4;
+    -fx-padding: 6 10 6 10;
+}
+
+/* Labels */
+.role-label {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-padding: 0 0 2 0;
+}
+
+.role-user {
+    -fx-text-fill: #89b4fa;
+}
+
+.role-assistant {
+    -fx-text-fill: #a6e3a1;
+}
+
+.role-tool {
+    -fx-text-fill: #f9e2af;
+}
+
+.role-system {
+    -fx-text-fill: #6c7086;
+}
+
+.role-error {
+    -fx-text-fill: #1e1e2e;
+}
+
+/* Text — base font size bumped for readability */
+.text-primary {
+    -fx-fill: #cdd6f4;
+    -fx-font-size: 15px;
+}
+
+.text-secondary {
+    -fx-fill: #a6adc8;
+    -fx-font-size: 14px;
+}
+
+.text-muted {
+    -fx-fill: #6c7086;
+    -fx-font-size: 13px;
+}
+
+.text-bold {
+    -fx-font-weight: bold;
+}
+
+.text-italic {
+    -fx-font-style: italic;
+}
+
+/* Inline code */
+.text-inline-code {
+    -fx-fill: #fab387;
+    -fx-font-family: "Cascadia Code", "Consolas", "NSimSun", "SimSun", monospace;
+    -fx-font-size: 14px;
+}
+
+/* Code block — wrapper with dark background */
+.code-block-box {
+    -fx-background-color: #181825;
+    -fx-padding: 10 14 10 14;
+    -fx-background-radius: 6;
+}
+
+.code-block-box .text-code-block {
+    -fx-fill: #cdd6f4;
+    -fx-font-family: "Cascadia Code", "Consolas", "NSimSun", "SimSun", monospace;
+    -fx-font-size: 13px;
+}
+
+/* Table rendered as VBox of HBox rows — font-independent layout */
+.table-block-vbox {
+    -fx-border-color: #45475a;
+    -fx-border-width: 1;
+    -fx-background-radius: 4;
+    -fx-background-color: rgba(69, 71, 90, 0.15);
+}
+
+.table-cell {
+    -fx-text-fill: #cdd6f4;
+    -fx-font-size: 13px;
+    -fx-padding: 4 8 4 8;
+    -fx-border-color: #45475a;
+    -fx-border-width: 0 1 1 0;
+}
+
+.table-header-cell {
+    -fx-font-weight: bold;
+    -fx-background-color: rgba(69, 71, 90, 0.3);
+    -fx-border-width: 0 1 1 0;
+}
+
+/* Math blocks (LaTeX rendered images) */
+.math-block {
+    -fx-background-color: rgba(69, 71, 90, 0.2);
+    -fx-background-radius: 6;
+    -fx-padding: 4 8 4 8;
+}
+
+.math-inline {
+    -fx-translate-y: 2;
+}
+
+/* Headings */
+.text-h1 {
+    -fx-fill: #cdd6f4;
+    -fx-font-size: 19px;
+    -fx-font-weight: bold;
+}
+
+.text-h2 {
+    -fx-fill: #cdd6f4;
+    -fx-font-size: 17px;
+    -fx-font-weight: bold;
+}
+
+.text-h3 {
+    -fx-fill: #cdd6f4;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+}
+
+/* Blockquote */
+.text-blockquote {
+    -fx-fill: #a6adc8;
+    -fx-font-size: 15px;
+    -fx-font-style: italic;
+}
+
+/* Input area */
+.input-area {
+    -fx-background-color: #313244;
+    -fx-padding: 8;
+    -fx-border-color: #45475a;
+    -fx-border-width: 1 0 0 0;
+}
+
+.input-field {
+    -fx-background-color: #1e1e2e;
+    -fx-text-fill: #cdd6f4;
+    -fx-prompt-text-fill: #6c7086;
+    -fx-font-size: 15px;
+    -fx-padding: 10 14 10 14;
+    -fx-background-radius: 6;
+    -fx-border-color: #45475a;
+}
+
+.input-field .content {
+    -fx-background-color: #1e1e2e;
+    -fx-background-radius: 6;
+}
+
+.input-field .scroll-pane {
+    -fx-background-color: #1e1e2e;
+}
+
+.input-field .scroll-pane .viewport {
+    -fx-background-color: #1e1e2e;
+}
+
+.input-field .scroll-bar:vertical {
+    -fx-background-color: #1e1e2e;
+}
+
+.input-field .scroll-bar:vertical .thumb {
+    -fx-background-color: #45475a;
+    -fx-background-radius: 4;
+}
+
+.send-button {
+    -fx-background-color: #89b4fa;
+    -fx-text-fill: #1e1e2e;
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+    -fx-padding: 10 18 10 18;
+    -fx-background-radius: 6;
+}
+
+.send-button:hover {
+    -fx-background-color: #b4d0fb;
+}
+
+/* Status bar */
+.status-bar {
+    -fx-background-color: #313244;
+    -fx-padding: 2 10 2 10;
+    -fx-spacing: 8;
+}
+
+.status-chip {
+    -fx-text-fill: #a6adc8;
+    -fx-font-size: 12px;
+}
+
+.status-model {
+    -fx-text-fill: #89b4fa;
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+}
+
+.status-tokens {
+    -fx-text-fill: #a6adc8;
+    -fx-font-size: 12px;
+}
+
+.status-indicator {
+    -fx-text-fill: #6c7086;
+    -fx-font-size: 11px;
+    -fx-padding: 0 6 0 6;
+    -fx-border-color: #45475a;
+    -fx-background-radius: 3;
+    -fx-border-width: 0 1 0 1;
+}
+
+.status-workdir {
+    -fx-cursor: hand;
+}
+
+.status-workdir:hover {
+    -fx-text-fill: #89b4fa;
+}
+
+/* Plan mode indicator in status bar */
+.status-mode {
+    -fx-text-fill: #a6adc8;
+    -fx-font-size: 12px;
+}
+
+.status-mode-plan {
+    -fx-text-fill: #f9e2af;
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+}
+
+/* Slash command suggestion popup */
+.slash-popup {
+    -fx-background-color: #313244;
+    -fx-border-color: #45475a;
+    -fx-background-radius: 4;
+    -fx-font-size: 13px;
+}
+
+.slash-popup .list-cell {
+    -fx-text-fill: #cdd6f4;
+    -fx-background-color: transparent;
+    -fx-padding: 6 10 6 10;
+}
+
+.slash-popup .list-cell:selected,
+.slash-popup .list-cell:hover {
+    -fx-background-color: #45475a;
+}
+
+/* Thinking pane — light gray to stay visible on dark background */
+.thinking-pane {
+    -fx-border-color: #45475a;
+    -fx-border-width: 0 0 0 2;
+}
+
+.thinking-pane > .title {
+    -fx-background-color: transparent;
+    -fx-text-fill: #a6adc8;
+    -fx-font-size: 12px;
+    -fx-padding: 2 4 2 4;
+}
+
+.thinking-content {
+    -fx-fill: #a6adc8;
+    -fx-font-size: 13px;
+    -fx-font-family: "Cascadia Code", "Consolas", "NSimSun", "SimSun", monospace;
+    -fx-padding: 4 8 4 8;
+}
+
+/* Provider select */
+.provider-card {
+    -fx-background-color: #313244;
+    -fx-background-radius: 8;
+    -fx-padding: 16;
+    -fx-cursor: hand;
+}
+
+.provider-card:hover {
+    -fx-background-color: #45475a;
+}
+
+.provider-name {
+    -fx-text-fill: #cdd6f4;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+}
+
+.provider-model {
+    -fx-text-fill: #89b4fa;
+    -fx-font-size: 14px;
+}
+
+.provider-protocol {
+    -fx-text-fill: #6c7086;
+    -fx-font-size: 13px;
+}
+
+.provider-subtitle {
+    -fx-text-fill: #a6adc8;
+    -fx-font-size: 14px;
+}
+
+/* Logo */
+.logo-text {
+    -fx-fill: #89b4fa;
+    -fx-font-family: "Monospaced";
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+}
+
+.logo-subtitle {
+    -fx-fill: #a6adc8;
+    -fx-font-size: 13px;
+}
+
+/* Sidebar */
+.sidebar-root {
+    -fx-background-color: #313244;
+}
+
+.sidebar-header {
+    -fx-text-fill: #cdd6f4;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-padding: 4 0 4 0;
+}
+
+.sidebar-new-btn {
+    -fx-background-color: #89b4fa;
+    -fx-text-fill: #1e1e2e;
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+    -fx-padding: 6 0 6 0;
+    -fx-background-radius: 4;
+}
+
+.sidebar-new-btn:hover {
+    -fx-background-color: #b4d0fb;
+}
+
+.sidebar-item {
+    -fx-text-fill: #a6adc8;
+    -fx-font-size: 12px;
+    -fx-padding: 4 6 4 6;
+    -fx-background-radius: 4;
+    -fx-background-color: transparent;
+    -fx-cursor: hand;
+}
+
+.sidebar-item:hover {
+    -fx-background-color: #45475a;
+}
+
+.sidebar-item-active {
+    -fx-text-fill: #cdd6f4;
+    -fx-font-size: 12px;
+    -fx-padding: 4 6 4 6;
+    -fx-background-radius: 4;
+    -fx-background-color: #45475a;
+}
+
+.sidebar-delete-btn {
+    -fx-background-color: transparent;
+    -fx-text-fill: #6c7086;
+    -fx-font-size: 10px;
+    -fx-padding: 0 4 0 0;
+}
+
+.sidebar-delete-btn:hover {
+    -fx-text-fill: #f38ba8;
+}
+
+/* Dialog */
+.dialog-pane {
+    -fx-background-color: #1e1e2e;
+}
+
+.dialog-pane .header-panel {
+    -fx-background-color: #313244;
+}
+
+.dialog-pane .content.label {
+    -fx-text-fill: #cdd6f4;
+    -fx-font-size: 15px;
+}
+
+.allow-button {
+    -fx-background-color: #a6e3a1;
+    -fx-text-fill: #1e1e2e;
+    -fx-font-size: 14px;
+    -fx-padding: 8 14 8 14;
+}
+
+.allow-always-button {
+    -fx-background-color: #89b4fa;
+    -fx-text-fill: #1e1e2e;
+    -fx-font-size: 14px;
+    -fx-padding: 8 14 8 14;
+}
+
+.deny-button {
+    -fx-background-color: #f38ba8;
+    -fx-text-fill: #1e1e2e;
+    -fx-font-size: 14px;
+    -fx-padding: 8 14 8 14;
+}
+
+/* Copy button on chat bubbles */
+.copy-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: #6c7086;
+    -fx-font-size: 11px;
+    -fx-padding: 2 4 2 4;
+    -fx-background-radius: 3;
+    -fx-cursor: hand;
+}
+
+.copy-button:hover {
+    -fx-background-color: #45475a;
+    -fx-text-fill: #89b4fa;
+}

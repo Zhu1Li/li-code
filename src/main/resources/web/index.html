@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LiCode</title>
+<style>
+  :root {
+    --bg: #1e1e2e; --mantle: #181825; --crust: #11111b; --surface: #313244;
+    --surface2: #45475a; --overlay: #585b70; --text: #cdd6f4; --subtext: #a6adc8; --muted: #7f849c;
+    --accent: #89b4fa; --sapphire: #74c7ec; --green: #a6e3a1; --yellow: #f9e2af; --red: #f38ba8;
+    --mauve: #cba6f7; --teal: #94e2d5; --peach: #fab387; --border: #2a2b3c;
+    --maxw: min(940px, 92%);
+    --radius: 14px;
+    --shadow: 0 8px 24px rgba(0,0,0,.28);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: grid; grid-template-columns: minmax(248px, 296px) 1fr; height: 100vh; overflow: hidden;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Roboto, sans-serif;
+    font-size: 16px; line-height: 1.5; -webkit-font-smoothing: antialiased;
+  }
+  body.with-files { grid-template-columns: minmax(220px, 280px) minmax(240px, 360px) 1fr; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--overlay); background-clip: padding-box; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  /* ── Sidebar ── */
+  #sidebar { background: var(--mantle); border-right: 1px solid var(--border); display: flex; flex-direction: column; min-width: 0; }
+  #sidebar .brand { padding: 18px 18px 14px; font-weight: 700; font-size: 19px; display: flex; align-items: center; gap: 10px; letter-spacing: .2px; }
+  #sidebar .brand .logo { width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, var(--accent), var(--mauve)); color: var(--crust); font-size: 14px; font-weight: 800; }
+  #newChat { margin: 0 14px 12px; padding: 11px; border: 1px solid var(--surface2); border-radius: 11px; cursor: pointer;
+    background: linear-gradient(135deg, var(--accent), var(--sapphire)); color: var(--crust); font-weight: 700; font-size: 14.5px;
+    transition: filter .15s, transform .05s; }
+  #newChat:hover { filter: brightness(1.06); }
+  #newChat:active { transform: translateY(1px); }
+  #sidebar .secLabel { padding: 4px 18px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+  #sessions { flex: 1; overflow-y: auto; padding: 4px 10px 14px; }
+  .session { padding: 10px 12px 10px 14px; border-radius: 11px; cursor: pointer; margin-bottom: 3px; position: relative; transition: background .12s; }
+  .session::before { content: ''; position: absolute; left: 4px; top: 50%; transform: translateY(-50%); width: 3px; height: 0; border-radius: 3px; background: var(--accent); transition: height .15s; }
+  .session:hover, .session.active { background: var(--surface); }
+  .session.active::before { height: 60%; }
+  .session .t { font-size: 14.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 20px; }
+  .session.active .t { font-weight: 600; }
+  .session .m { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .session .del { position: absolute; top: 8px; right: 8px; color: var(--muted); font-size: 18px; line-height: 1; opacity: 0; border: none; background: none; cursor: pointer; border-radius: 6px; width: 24px; height: 24px; transition: opacity .12s, color .12s; }
+  .session:hover .del { opacity: 1; }
+  .session .del:hover { color: var(--red); background: var(--surface2); }
+
+  /* ── Main ── */
+  #main { display: grid; grid-template-rows: auto 1fr auto; min-width: 0; min-height: 0; }
+
+  /* Status bar */
+  #statusbar { display: flex; align-items: center; gap: 9px; padding: 11px 18px; background: rgba(24,24,37,.85); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .chip { font-size: 13px; padding: 5px 11px; border-radius: 999px; background: var(--surface); border: 1px solid transparent; color: var(--subtext); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; position: relative; transition: background .12s, color .12s, border-color .12s; }
+  .chip.model { background: transparent; color: var(--green); font-weight: 600; font-family: ui-monospace, "SF Mono", monospace; font-size: 14px; padding-left: 2px; }
+  .chip.model::before { content: '●'; color: var(--green); font-size: 9px; margin-right: 2px; }
+  .chip.hoverable, .chip.btn { cursor: pointer; }
+  .chip.hoverable:hover, .chip.btn:hover { background: var(--surface2); color: var(--text); border-color: var(--overlay); }
+  .chip .n { color: var(--text); font-weight: 700; }
+  .chip.tokens { font-family: ui-monospace, monospace; background: transparent; color: var(--muted); }
+  .chip.workdir { max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
+  .spacer { flex: 1; }
+  .pop { position: fixed; z-index: 60; background: var(--crust); border: 1px solid var(--surface2); border-radius: 11px; padding: 9px; max-height: 60vh; overflow: auto; min-width: 210px; max-width: 360px; box-shadow: var(--shadow); font-size: 13px; }
+  .pop .ph { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; margin: 2px 4px 8px; }
+  .pop .it { padding: 5px 8px; border-radius: 7px; color: var(--subtext); font-family: ui-monospace, monospace; word-break: break-all; }
+  .pop .it:hover { background: var(--surface); color: var(--text); }
+  .pop .empty { color: var(--muted); padding: 4px 8px; }
+
+  /* Chat */
+  #chat { overflow-y: auto; overflow-x: hidden; padding: 24px 18px 28px; display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+  #chat > * { flex: 0 0 auto; min-width: 0; max-width: var(--maxw); width: 100%; align-self: center; }
+  .msg { display: flex; gap: 12px; }
+  .msg.user { flex-direction: row-reverse; }
+  .avatar { width: 36px; height: 36px; border-radius: 11px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12.5px; color: var(--crust); box-shadow: var(--shadow); }
+  .avatar.u { background: linear-gradient(135deg, var(--accent), var(--sapphire)); }
+  .avatar.a { background: linear-gradient(135deg, var(--mauve), var(--peach)); }
+  .bubble { min-width: 0; padding: 13px 16px; border-radius: var(--radius); line-height: 1.62; font-size: 15.5px; max-width: 86%; box-shadow: var(--shadow); }
+  .msg.assistant .bubble { background: var(--mantle); border: 1px solid var(--border); border-top-left-radius: 5px; }
+  .msg.user .bubble { background: linear-gradient(135deg, rgba(137,180,250,.20), rgba(116,199,236,.16)); border: 1px solid rgba(137,180,250,.32); border-top-right-radius: 5px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  /* Markdown inside assistant bubbles */
+  .bubble > :first-child { margin-top: 0; } .bubble > :last-child { margin-bottom: 0; }
+  .bubble p { margin: .55em 0; overflow-wrap: anywhere; }
+  .bubble h1,.bubble h2,.bubble h3,.bubble h4 { margin: .7em 0 .35em; line-height: 1.3; }
+  .bubble h1 { font-size: 1.4em; } .bubble h2 { font-size: 1.25em; } .bubble h3 { font-size: 1.12em; } .bubble h4 { font-size: 1em; }
+  .bubble ul,.bubble ol { margin: .45em 0; padding-left: 1.5em; } .bubble li { margin: .22em 0; }
+  .bubble blockquote { margin: .55em 0; padding: .25em .9em; border-left: 3px solid var(--surface2); color: var(--subtext); }
+  .bubble a { color: var(--sapphire); text-decoration: none; } .bubble a:hover { text-decoration: underline; }
+  .bubble hr { border: none; border-top: 1px solid var(--border); margin: .8em 0; }
+  .bubble code { background: var(--crust); padding: 1.5px 5px; border-radius: 5px; font-family: ui-monospace, monospace; font-size: .88em; }
+  .bubble pre { background: var(--crust); padding: 12px 14px; border-radius: 10px; overflow-x: auto; border: 1px solid var(--border); }
+  .bubble pre code { background: none; padding: 0; }
+  .bubble table { border-collapse: collapse; margin: .6em 0; display: block; width: max-content; max-width: 100%; overflow-x: auto; font-size: .95em; }
+  .bubble th,.bubble td { border: 1px solid var(--border); padding: 7px 11px; text-align: left; vertical-align: top; }
+  .bubble thead th { background: var(--surface); font-weight: 700; white-space: nowrap; }
+  .bubble tbody tr:nth-child(even) { background: rgba(255,255,255,.02); }
+  .system .b { padding: 9px 14px; border: 1px dashed var(--border); border-radius: 11px; color: var(--subtext); font-size: 14px; background: rgba(255,255,255,.015); }
+  .error .b { padding: 11px 14px; border: 1px solid var(--red); border-radius: 11px; color: var(--red); white-space: pre-wrap; background: rgba(243,139,168,.06); }
+
+  /* Collapsible cards */
+  .card { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--mantle); box-shadow: var(--shadow); }
+  .card .chead { padding: 9px 14px; cursor: pointer; display: flex; gap: 9px; align-items: center; font-size: 13.5px; user-select: none; transition: background .12s; }
+  .card .chead:hover { background: var(--surface); }
+  .card .chead .caret { color: var(--muted); font-size: 11px; width: 10px; flex: 0 0 auto; }
+  .card .chead .meta { margin-left: auto; flex: 0 0 auto; color: var(--muted); font-size: 11.5px; font-family: ui-monospace, monospace; }
+  .card .cbody { overflow: auto; }
+  .card.collapsed .cbody { display: none; }
+
+  .thinkcard .chead { color: var(--subtext); font-style: italic; }
+  .thinkcard .cbody { padding: 2px 14px 12px; color: var(--subtext); font-style: italic; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 46vh; font-size: 14px; line-height: 1.6; }
+
+  .toolcard .chead .tname { color: var(--yellow); font-family: ui-monospace, monospace; font-weight: 600; flex: 0 0 auto; }
+  .toolcard .chead .summary { color: var(--muted); font-family: ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .toolcard .cbody { max-height: 60vh; }
+  .tsection + .tsection { border-top: 1px solid var(--border); }
+  .tsection .slabel { color: var(--muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; padding: 8px 14px 0; }
+  .tsection .scontent { font-family: ui-monospace, monospace; font-size: 13px; background: var(--crust); }
+  .tsection .scontent pre { margin: 0; padding: 8px 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .tsection.err .scontent pre { color: var(--red); }
+  .diff { display: block; min-width: max-content; }
+  .diff .line { display: block; white-space: pre; padding: 1px 14px; }
+  .diff .add { background: rgba(166,227,161,.13); color: var(--green); }
+  .diff .del { background: rgba(243,139,168,.13); color: var(--red); }
+  .diff .keep { color: var(--muted); }
+
+  /* Permission */
+  .perm { border: 1px solid var(--yellow); border-radius: 12px; padding: 14px 16px; background: rgba(249,226,175,.06); box-shadow: var(--shadow); }
+  .perm .title { color: var(--yellow); font-weight: 700; margin-bottom: 7px; font-size: 15px; }
+  .perm .desc { color: var(--subtext); font-size: 13.5px; margin-bottom: 11px; white-space: pre-wrap; overflow-wrap: anywhere; font-family: ui-monospace, monospace; }
+  .perm .pbody { max-height: 56vh; overflow: auto; background: var(--crust); border-radius: 8px; margin-bottom: 12px; font-family: ui-monospace, monospace; font-size: 13px; border: 1px solid var(--border); }
+  .perm button { margin-right: 9px; padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 600; transition: filter .12s, transform .05s; }
+  .perm button:hover { filter: brightness(1.08); } .perm button:active { transform: translateY(1px); }
+  .perm .allow { background: var(--accent); color: var(--crust); }
+  .perm .always { background: var(--teal); color: var(--crust); }
+  .perm .deny { background: var(--red); color: var(--crust); }
+
+  /* Footer */
+  #footer { padding: 14px 18px 18px; background: var(--mantle); border-top: 1px solid var(--border); }
+  .inputrow { max-width: var(--maxw); margin: 0 auto; display: flex; gap: 11px; align-items: flex-end; background: var(--bg); border: 1px solid var(--border); border-radius: 16px; padding: 8px 8px 8px 14px; transition: border-color .15s, box-shadow .15s; }
+  .inputrow:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(137,180,250,.15); }
+  textarea { flex: 1; resize: none; background: transparent; color: var(--text); border: none; outline: none; padding: 6px 0; font-family: inherit; font-size: 16px; line-height: 1.5; max-height: 220px; }
+  #send { padding: 11px 22px; border-radius: 11px; border: none; cursor: pointer; align-self: stretch; background: linear-gradient(135deg, var(--accent), var(--sapphire)); color: var(--crust); font-weight: 700; font-size: 15px; transition: filter .12s, transform .05s; }
+  #send:hover { filter: brightness(1.06); } #send:active { transform: translateY(1px); }
+  #send.stop { background: linear-gradient(135deg, var(--red), var(--peach)); }
+
+  /* Modal */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(3px); }
+  .modal { background: var(--bg); border: 1px solid var(--surface2); border-radius: 14px; padding: 22px; width: min(560px, 92%); box-shadow: var(--shadow); }
+  .modal h3 { margin: 0 0 12px; font-size: 17px; }
+  .modal input { width: 100%; padding: 11px 13px; border-radius: 9px; border: 1px solid var(--border); background: var(--crust); color: var(--text); font-family: ui-monospace, monospace; font-size: 14px; outline: none; }
+  .modal input:focus { border-color: var(--accent); }
+  .modal .row { display: flex; gap: 9px; justify-content: flex-end; margin-top: 14px; }
+  .modal button { padding: 9px 18px; border-radius: 9px; border: none; cursor: pointer; font-size: 14px; font-weight: 600; }
+  .modal .ok { background: var(--accent); color: var(--crust); }
+  .modal .cancel { background: var(--surface); color: var(--text); }
+
+  @media (max-width: 760px) { body { grid-template-columns: 0 1fr; } #sidebar { display: none; } }
+
+  /* ── File Explorer Panel ── */
+  #filePanel { background: var(--mantle); border-right: 1px solid var(--border); display: flex; flex-direction: column; min-width: 240px; max-width: 380px; overflow: hidden; }
+  #filePanel .fphead { display: flex; align-items: center; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--border); flex: 0 0 auto; }
+  #filePanel .fphead .fptitle { font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+  #filePanel .fphead .spacer { flex: 1; }
+  #filePanel .fphead button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 5px; line-height: 1; transition: color .12s, background .12s; }
+  #filePanel .fphead button:hover { color: var(--text); background: var(--surface2); }
+  #filePanel .fpbody { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 6px 0; }
+  #filePanel .fpbody .fpempty { color: var(--muted); font-size: 13px; padding: 16px; text-align: center; }
+  .fpent { display: flex; align-items: center; gap: 6px; padding: 5px 14px; cursor: pointer; font-size: 13px; color: var(--subtext); transition: background .08s, color .08s; user-select: none; white-space: nowrap; }
+  .fpent:hover { background: var(--surface); color: var(--text); }
+  .fpent.selected { background: var(--surface); color: var(--accent); font-weight: 500; }
+  .fpent .fpicon { font-size: 15px; width: 18px; text-align: center; flex: 0 0 auto; }
+  .fpent .fpname { overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
+  .fpent .fpsize { color: var(--muted); font-size: 11px; font-family: ui-monospace, monospace; flex: 0 0 auto; margin-left: 4px; }
+  .fpent.dir { font-weight: 500; }
+  .fpent.loading { opacity: .5; pointer-events: none; }
+  .fpchildren { padding-left: 12px; }
+  .fpchildren.collapsed { display: none; }
+  #toggleFiles { cursor: pointer; }
+  #toggleFiles.active { background: var(--surface2); color: var(--text); border-color: var(--overlay); }
+
+  @media (max-width: 1080px) { #filePanel { min-width: 200px; max-width: 280px; } }
+  @media (max-width: 760px) { #filePanel { display: none; } }
+</style>
+</head>
+<body>
+  <aside id="sidebar">
+    <div class="brand"><span class="logo">Li</span> LiCode</div>
+    <button id="newChat">+ New Chat</button>
+    <div class="secLabel">Sessions</div>
+    <div id="sessions"></div>
+  </aside>
+
+  <div id="filePanel" style="display:none">
+    <div class="fphead">
+      <span class="fptitle">📂 Files</span>
+      <span class="spacer"></span>
+      <button id="fpRefresh" title="Refresh">↻</button>
+      <button id="fpClose" title="Close panel">✕</button>
+    </div>
+    <div class="fpbody" id="fpTree"></div>
+  </div>
+
+  <div id="main">
+    <div id="statusbar">
+      <span class="chip btn" id="toggleFiles" title="Toggle file explorer">📂 Files</span>
+      <span class="chip model" id="modelChip">—</span>
+      <span class="chip hoverable workdir" id="workdirChip" title="Click to change working folder">📁 —</span>
+      <span class="spacer"></span>
+      <span class="chip hoverable" id="mcpChip" data-key="mcp" data-head="MCP servers">MCP <span class="n">0</span></span>
+      <span class="chip hoverable" id="toolsChip" data-key="tools" data-head="Tools">Tools <span class="n">0</span></span>
+      <span class="chip hoverable" id="skillsChip" data-key="skills" data-head="Skills">Skills <span class="n">0</span></span>
+      <span class="chip hoverable" id="hooksChip" data-key="hooks" data-head="Hooks">Hooks <span class="n">0</span></span>
+      <span class="chip tokens" id="tokenChip">↓0  ↑0</span>
+    </div>
+    <div id="chat"></div>
+    <div id="footer">
+      <div class="inputrow">
+        <textarea id="input" rows="1" placeholder="Ask LiCode anything…  (Enter to send · Shift+Enter for newline)"></textarea>
+        <button id="send">Send</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const chat = document.getElementById('chat');
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('send');
+const THINK_COLLAPSE = 600;
+let streaming = false, controller = null;
+let inTokens = 0, outTokens = 0;
+let statusData = { mcp:{names:[]}, tools:{names:[]}, skills:{names:[]}, hooks:{names:[]} };
+
+/* ── Markdown rendering (GFM-ish: tables, headings, lists, quotes, code, inline) ── */
+function escapeHtml(s){ return s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function mdInline(s){
+  return s.split(/(`[^`]+`)/).map(p => {
+    if (p.length>1 && p.startsWith('`') && p.endsWith('`')) return '<code>'+escapeHtml(p.slice(1,-1))+'</code>';
+    let t = escapeHtml(p);
+    t = t.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+    t = t.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
+    t = t.replace(/(^|[^*])\*([^*\n]+)\*/g,'$1<i>$2</i>');
+    return t;
+  }).join('');
+}
+function splitRow(line){ return line.trim().replace(/^\|/,'').replace(/\|$/,'').split('|').map(c=>c.trim()); }
+function mdBlocks(md){
+  const lines = md.split('\n'); let html=''; let i=0; let para=[];
+  const flush = () => { if (para.length){ html += '<p>'+mdInline(para.join(' '))+'</p>'; para=[]; } };
+  while (i < lines.length){
+    const line = lines[i];
+    if (/\|/.test(line) && i+1 < lines.length && /^\s*\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)+\|?\s*$/.test(lines[i+1])){
+      flush(); const header = splitRow(line); i += 2; const rows = [];
+      while (i < lines.length && lines[i].trim() !== '' && /\|/.test(lines[i])){ rows.push(splitRow(lines[i])); i++; }
+      html += '<table><thead><tr>' + header.map(c=>'<th>'+mdInline(c)+'</th>').join('') + '</tr></thead><tbody>'
+            + rows.map(r => '<tr>' + header.map((_,k)=>'<td>'+mdInline(r[k]||'')+'</td>').join('') + '</tr>').join('')
+            + '</tbody></table>';
+      continue;
+    }
+    let m;
+    if ((m = line.match(/^\s*(#{1,6})\s+(.*)$/))){ flush(); const n=m[1].length; html += '<h'+n+'>'+mdInline(m[2])+'</h'+n+'>'; i++; continue; }
+    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)){ flush(); html += '<hr>'; i++; continue; }
+    if (/^\s*>\s?/.test(line)){ flush(); const q=[]; while (i<lines.length && /^\s*>\s?/.test(lines[i])){ q.push(lines[i].replace(/^\s*>\s?/,'')); i++; } html += '<blockquote>'+mdBlocks(q.join('\n'))+'</blockquote>'; continue; }
+    if (/^\s*[-*+]\s+/.test(line)){ flush(); const items=[]; while (i<lines.length && /^\s*[-*+]\s+/.test(lines[i])){ items.push(lines[i].replace(/^\s*[-*+]\s+/,'')); i++; } html += '<ul>'+items.map(it=>'<li>'+mdInline(it)+'</li>').join('')+'</ul>'; continue; }
+    if (/^\s*\d+\.\s+/.test(line)){ flush(); const items=[]; while (i<lines.length && /^\s*\d+\.\s+/.test(lines[i])){ items.push(lines[i].replace(/^\s*\d+\.\s+/,'')); i++; } html += '<ol>'+items.map(it=>'<li>'+mdInline(it)+'</li>').join('')+'</ol>'; continue; }
+    if (line.trim()===''){ flush(); i++; continue; }
+    para.push(line.trim()); i++;
+  }
+  flush(); return html;
+}
+function renderMarkdown(text){
+  const segs = text.split(/```/); let html='';
+  for (let i=0;i<segs.length;i++){
+    if (i%2===1){ const nl=segs[i].indexOf('\n'); const code=(nl>=0?segs[i].slice(nl+1):segs[i]).replace(/\n$/,''); html += '<pre><code>'+escapeHtml(code)+'</code></pre>'; }
+    else html += mdBlocks(segs[i]);
+  }
+  return html;
+}
+
+/* ── scroll/util ── */
+function atBottom(){ return chat.scrollHeight - chat.scrollTop - chat.clientHeight < 120; }
+function scrollDown(force){ if (force || atBottom()) chat.scrollTop = chat.scrollHeight; }
+function fmtTok(n){ return n>=1000 ? (n/1000).toFixed(1)+'k' : ''+n; }
+function updateTokenChip(){ document.getElementById('tokenChip').textContent = '↓'+fmtTok(inTokens)+'  ↑'+fmtTok(outTokens); }
+
+function addBubble(role){
+  const wrap = document.createElement('div'); wrap.className = 'msg '+role;
+  const av = document.createElement('div'); av.className = 'avatar '+(role==='user'?'u':'a'); av.textContent = role==='user'?'You':'Li';
+  const b = document.createElement('div'); b.className = 'bubble';
+  wrap.append(av, b); chat.appendChild(wrap); scrollDown(true);
+  return b;
+}
+function addCenter(kind){
+  const wrap = document.createElement('div'); wrap.className = kind;
+  const b = document.createElement('div'); b.className = 'b';
+  wrap.appendChild(b); chat.appendChild(wrap); scrollDown(true);
+  return b;
+}
+
+function makeThinkingCard(){
+  const card = document.createElement('div'); card.className = 'card thinkcard';
+  const head = document.createElement('div'); head.className = 'chead';
+  const caret = document.createElement('span'); caret.className='caret'; caret.textContent = '▾';
+  const label = document.createElement('span'); label.textContent = '💭 Thinking';
+  const meta = document.createElement('span'); meta.className = 'meta';
+  head.append(caret, label, meta);
+  const body = document.createElement('div'); body.className = 'cbody';
+  head.onclick = () => { card._user = true; const c = card.classList.toggle('collapsed'); caret.textContent = c ? '▸' : '▾'; };
+  card.append(head, body); chat.appendChild(card); scrollDown(true);
+  return {
+    setText(t){ body.textContent = t; meta.textContent = t.length + ' chars';
+      if (!card._user && !card._auto && t.length > THINK_COLLAPSE){ card.classList.add('collapsed'); caret.textContent='▸'; card._auto=true; }
+      if (!card.classList.contains('collapsed')) body.scrollTop = body.scrollHeight; scrollDown(); },
+    collapse(){ card.classList.add('collapsed'); caret.textContent='▸'; }
+  };
+}
+
+/* Tool card: collapsed shows name + summary + status; expand shows Parameters + Result. */
+function makeToolCard(name){
+  const card = document.createElement('div'); card.className = 'card toolcard';
+  const head = document.createElement('div'); head.className = 'chead';
+  const caret = document.createElement('span'); caret.className='caret'; caret.textContent='▾';
+  const icon = document.createElement('span'); icon.textContent='⚙';
+  const tname = document.createElement('span'); tname.className='tname'; tname.textContent=name;
+  const summary = document.createElement('span'); summary.className='summary';
+  const meta = document.createElement('span'); meta.className='meta'; meta.textContent='running…';
+  head.append(caret, icon, tname, summary, meta);
+  const body = document.createElement('div'); body.className='cbody';
+  const paramSec = document.createElement('div'); paramSec.className='tsection';
+  const paramLabel = document.createElement('div'); paramLabel.className='slabel'; paramLabel.textContent='Parameters';
+  const paramContent = document.createElement('div'); paramContent.className='scontent';
+  paramSec.append(paramLabel, paramContent);
+  const resSec = document.createElement('div'); resSec.className='tsection'; resSec.style.display='none';
+  const resLabel = document.createElement('div'); resLabel.className='slabel'; resLabel.textContent='Result';
+  const resContent = document.createElement('div'); resContent.className='scontent';
+  resSec.append(resLabel, resContent);
+  body.append(paramSec, resSec);
+  head.onclick = () => card.classList.toggle('collapsed');
+  card.append(head, body); chat.appendChild(card); scrollDown(true);
+  return { card, icon, summary, meta, paramContent, resSec, resContent, paramSec };
+}
+function setPre(el, text){ el.innerHTML=''; const pre=document.createElement('pre'); pre.textContent=text; el.appendChild(pre); }
+function renderDiff(el, diff){
+  let adds=0, dels=0; const wrap=document.createElement('div'); wrap.className='diff';
+  for (const l of diff){ const d=document.createElement('span'); d.className='line '+(l.t==='+'?'add':l.t==='-'?'del':'keep'); d.textContent=(l.t===' '?'  ':l.t+' ')+l.text; wrap.appendChild(d); if(l.t==='+')adds++; else if(l.t==='-')dels++; }
+  el.innerHTML=''; el.appendChild(wrap); return {adds, dels};
+}
+
+/* ── status bar + hover popovers ── */
+async function refreshStatus(){
+  try {
+    const s = await (await fetch('/api/status')).json();
+    statusData = s;
+    document.getElementById('modelChip').textContent = s.model || '—';
+    document.querySelector('#mcpChip .n').textContent = s.mcp.count;
+    document.querySelector('#toolsChip .n').textContent = s.tools.count;
+    document.querySelector('#skillsChip .n').textContent = s.skills.count;
+    document.querySelector('#hooksChip .n').textContent = s.hooks.count;
+    const wd = s.workDir || ''; const short = wd.length > 34 ? '…' + wd.slice(-32) : wd;
+    const chip = document.getElementById('workdirChip');
+    chip.textContent = '📁 ' + short; chip.title = wd + '  (click to change)'; chip._full = wd;
+  } catch (e) {}
+}
+let openPop = null, popTimer = null;
+function showPop(anchor, heading, names){
+  hidePop();
+  const pop = document.createElement('div'); pop.className='pop';
+  const h = document.createElement('div'); h.className='ph'; h.textContent = heading + (names ? ' · '+names.length : ''); pop.appendChild(h);
+  if (!names || !names.length){ const e=document.createElement('div'); e.className='empty'; e.textContent='none'; pop.appendChild(e); }
+  else for (const n of names){ const d=document.createElement('div'); d.className='it'; d.textContent=n; pop.appendChild(d); }
+  document.body.appendChild(pop);
+  const r = anchor.getBoundingClientRect();
+  pop.style.top = (r.bottom + 7) + 'px';
+  pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - pop.offsetWidth - 12)) + 'px';
+  pop.addEventListener('mouseenter', () => clearTimeout(popTimer));
+  pop.addEventListener('mouseleave', scheduleHide);
+  openPop = pop;
+}
+function scheduleHide(){ clearTimeout(popTimer); popTimer = setTimeout(hidePop, 200); }
+function hidePop(){ if (openPop){ openPop.remove(); openPop=null; } }
+document.querySelectorAll('.chip.hoverable[data-key]').forEach(chip => {
+  chip.addEventListener('mouseenter', () => { clearTimeout(popTimer); showPop(chip, chip.dataset.head, statusData[chip.dataset.key].names); });
+  chip.addEventListener('mouseleave', scheduleHide);
+});
+
+/* ── working folder ── */
+async function applyWorkdir(val){
+  const res = await (await fetch('/api/workdir?path=' + encodeURIComponent(val), {method:'POST'})).json();
+  if (res.error){ alert(res.error); return false; }
+  chat.innerHTML=''; inTokens=outTokens=0; updateTokenChip(); refreshStatus(); refreshSessions(); return true;
+}
+document.getElementById('workdirChip').addEventListener('click', async () => {
+  let res = null;
+  try { res = await (await fetch('/api/workdir/pick', {method:'POST'})).json(); } catch (e) {}
+  if (res && res.path){ await applyWorkdir(res.path); return; }
+  if (res && res.cancelled) return;
+  openModal('Change working folder', document.getElementById('workdirChip')._full || '', applyWorkdir);
+});
+function openModal(title, value, onOk){
+  const ov = document.createElement('div'); ov.className='overlay';
+  const m = document.createElement('div'); m.className='modal'; m.innerHTML = '<h3>'+escapeHtml(title)+'</h3>';
+  const inp = document.createElement('input'); inp.value = value; inp.spellcheck=false;
+  const row = document.createElement('div'); row.className='row';
+  const cancel = document.createElement('button'); cancel.className='cancel'; cancel.textContent='Cancel';
+  const ok = document.createElement('button'); ok.className='ok'; ok.textContent='Set folder';
+  row.append(cancel, ok); m.append(inp, row); ov.appendChild(m); document.body.appendChild(ov);
+  inp.focus(); inp.select();
+  const close = () => ov.remove();
+  cancel.onclick = close; ov.onclick = (e)=>{ if(e.target===ov) close(); };
+  ok.onclick = async () => { const v=inp.value.trim(); if(!v) return; const done=await onOk(v); if(done!==false) close(); };
+  inp.addEventListener('keydown', e => { if(e.key==='Enter') ok.click(); if(e.key==='Escape') close(); });
+}
+
+/* ── sessions ── */
+async function refreshSessions(){
+  let list = [];
+  try { list = await (await fetch('/api/sessions')).json(); } catch (e) {}
+  const box = document.getElementById('sessions'); box.innerHTML='';
+  for (const s of list){
+    const row = document.createElement('div'); row.className='session'+(s.active?' active':'');
+    const t = document.createElement('div'); t.className='t'; t.textContent=s.title;
+    const m = document.createElement('div'); m.className='m'; m.textContent=s.messageCount+' msgs · '+fmtTime(s.modTime);
+    const del = document.createElement('button'); del.className='del'; del.textContent='×'; del.title='Delete session';
+    del.onclick = (e)=>{ e.stopPropagation(); deleteSession(s.id); };
+    row.append(t, m, del); row.onclick = () => switchSession(s.id); box.appendChild(row);
+  }
+}
+function fmtTime(iso){
+  if (!iso) return '';
+  const d=new Date(iso), now=new Date();
+  return d.toDateString()===now.toDateString() ? d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : (d.getMonth()+1)+'-'+d.getDate();
+}
+async function switchSession(id){
+  if (streaming) await stop();
+  const res = await (await fetch('/api/session?action=switch&id='+encodeURIComponent(id), {method:'POST'})).json();
+  chat.innerHTML=''; inTokens=outTokens=0; updateTokenChip();
+  for (const msg of (res.messages || [])){
+    if (msg.role==='tool'){ const t=makeToolCard(msg.content); t.meta.textContent=''; t.paramSec.style.display='none'; t.card.classList.add('collapsed'); }
+    else if (msg.role==='thinking'){ const c=makeThinkingCard(); c.setText(msg.content); c.collapse(); }
+    else if (msg.role==='assistant') addBubble('assistant').innerHTML = renderMarkdown(msg.content);
+    else addBubble('user').textContent = msg.content;
+  }
+  scrollDown(true); refreshSessions();
+}
+async function newSession(){
+  if (streaming) await stop();
+  await fetch('/api/session?action=new', {method:'POST'});
+  chat.innerHTML=''; inTokens=outTokens=0; updateTokenChip(); refreshSessions(); refreshStatus();
+}
+async function deleteSession(id){
+  await fetch('/api/session?action=delete&id='+encodeURIComponent(id), {method:'POST'}); refreshSessions();
+}
+
+/* ── streaming chat ── */
+function setStreaming(on){ streaming=on; sendBtn.textContent=on?'Stop':'Send'; sendBtn.classList.toggle('stop', on); }
+async function send(){
+  if (streaming){ stop(); return; }
+  const text = input.value.trim(); if (!text) return;
+  input.value=''; input.style.height='auto';
+  addBubble('user').textContent = text;
+
+  setStreaming(true);
+  let asstBubble=null, asstText='', thinkCard=null, thinkText='';
+  const tools = {};
+
+  controller = new AbortController();
+  let resp;
+  try { resp = await fetch('/api/chat', {method:'POST', body:text, signal:controller.signal}); }
+  catch (e){ if (e.name!=='AbortError') addCenter('error').textContent = String(e); setStreaming(false); return; }
+
+  const reader = resp.body.getReader(); const decoder = new TextDecoder(); let buf='';
+
+  function handle(evt){
+    switch (evt.type){
+      case 'text':
+        if (!asstBubble) asstBubble = addBubble('assistant');
+        asstText += evt.text; asstBubble.innerHTML = renderMarkdown(asstText); scrollDown(); break;
+      case 'thinking':
+        if (!thinkCard) thinkCard = makeThinkingCard();
+        thinkText += evt.text; thinkCard.setText(thinkText); break;
+      case 'thinking_done':
+        if (thinkCard) thinkCard.collapse(); thinkCard=null; thinkText=''; break;
+      case 'tool':
+        if (evt.phase==='start') tools[evt.id] = makeToolCard(evt.name);
+        asstBubble=null; asstText=''; break;
+      case 'tool_stream': {
+        let t = tools[evt.id] || (tools[evt.id]=makeToolCard(evt.name));
+        if (!t.previewed){ setPre(t.paramContent, evt.text); t.paramContent.scrollTop=t.paramContent.scrollHeight; scrollDown(); }
+        break;
+      }
+      case 'tool_preview': {
+        let t = tools[evt.id] || (tools[evt.id]=makeToolCard(evt.name));
+        t.previewed = true;
+        if (evt.kind==='write' || evt.kind==='edit'){
+          t.icon.textContent='✍';
+          if (evt.path){ t.summary.textContent=evt.path; }
+          if (evt.diff){ const {adds,dels}=renderDiff(t.paramContent, evt.diff); t.meta.textContent=(evt.isNew?'new ':'')+'+'+adds+' −'+dels; }
+        } else {
+          t.icon.textContent='⚙';
+          if (evt.argsText){ setPre(t.paramContent, evt.argsText); t.summary.textContent = evt.argsText.split('\n')[0].slice(0, 80); }
+          t.meta.textContent='';
+        }
+        break;
+      }
+      case 'tool_result': {
+        let t = tools[evt.id] || (tools[evt.id]=makeToolCard(evt.name));
+        t.icon.textContent = evt.isError ? '✗' : '✓';
+        if (evt.isError) t.resSec.classList.add('err');
+        setPre(t.resContent, evt.output && evt.output.length ? evt.output : '(no output)');
+        t.resSec.style.display='';
+        const el = (evt.elapsed!=null && evt.elapsed>0) ? '  ·  '+evt.elapsed+'s' : '';
+        t.meta.textContent = (t.meta.textContent && !t.meta.textContent.includes('running') ? t.meta.textContent : '') + el;
+        t.card.classList.add('collapsed');  // tidy: collapse finished tool into a card
+        break;
+      }
+      case 'permission': showPermission(evt); break;
+      case 'error': addCenter('error').textContent = evt.message; break;
+      case 'done':
+        inTokens += evt.inputTokens||0; outTokens += evt.outputTokens||0; updateTokenChip();
+        setStreaming(false); refreshSessions(); refreshStatus(); break;
+    }
+  }
+
+  try {
+    while (true){
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      buf += decoder.decode(chunk.value, {stream:true});
+      let idx;
+      while ((idx = buf.indexOf('\n\n')) >= 0){
+        const frame = buf.slice(0, idx); buf = buf.slice(idx+2);
+        const line = frame.split('\n').find(l => l.startsWith('data: '));
+        if (line){ try { handle(JSON.parse(line.slice(6))); } catch (e) {} }
+      }
+    }
+  } catch (e) {}
+  setStreaming(false);
+}
+
+function showPermission(evt){
+  const div = document.createElement('div'); div.className='perm';
+  div.innerHTML = '<div class="title">⚠ Allow tool: '+escapeHtml(evt.name)+'?</div>'
+    + '<div class="desc">'+escapeHtml(evt.description||'')+'</div>';
+  if (evt.diff){ const body=document.createElement('div'); body.className='pbody'; renderDiff(body, evt.diff); div.appendChild(body); }
+  const mk = (label, cls, decision) => { const btn=document.createElement('button'); btn.className=cls; btn.textContent=label;
+    btn.onclick = () => { fetch('/api/permission?id='+encodeURIComponent(evt.id)+'&decision='+decision, {method:'POST'}); div.remove(); }; return btn; };
+  div.append(mk('Allow','allow','allow'), mk('Allow always','always','always'), mk('Deny','deny','deny'));
+  chat.appendChild(div); scrollDown(true);
+}
+async function stop(){
+  if (controller){ try { controller.abort(); } catch (e) {} }
+  try { await fetch('/api/stop', {method:'POST'}); } catch (e) {}
+  setStreaming(false);
+}
+
+/* ── wiring ── */
+sendBtn.onclick = send;
+document.getElementById('newChat').onclick = newSession;
+input.addEventListener('keydown', e => { if (e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); } });
+input.addEventListener('input', () => { input.style.height='auto'; input.style.height = Math.min(input.scrollHeight, 220)+'px'; });
+input.focus();
+refreshStatus(); refreshSessions();
+setTimeout(refreshStatus, 2000);
+
+/* ── File Explorer ── */
+const filePanel = document.getElementById('filePanel');
+const fpTree = document.getElementById('fpTree');
+const toggleBtn = document.getElementById('toggleFiles');
+let filePanelVisible = false;
+
+function toggleFilePanel(){
+  filePanelVisible = !filePanelVisible;
+  filePanel.style.display = filePanelVisible ? 'flex' : 'none';
+  toggleBtn.classList.toggle('active', filePanelVisible);
+  document.body.classList.toggle('with-files', filePanelVisible);
+  if (filePanelVisible) loadDir('');
+}
+
+toggleBtn.onclick = toggleFilePanel;
+document.getElementById('fpClose').onclick = () => { if (filePanelVisible) toggleFilePanel(); };
+document.getElementById('fpRefresh').onclick = () => loadDir(fpTree._currentPath || '');
+
+function fmtSize(bytes){
+  if (bytes < 0) return '';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+const fileIcons = {
+  dir: '📁',
+  file: '📄',
+  // common file types
+  '.java': '☕', '.py': '🐍', '.js': '🟨', '.ts': '🟦', '.html': '🌐', '.css': '🎨',
+  '.json': '📋', '.xml': '📰', '.yaml': '⚙', '.yml': '⚙', '.md': '📝', '.txt': '📃',
+  '.png': '🖼', '.jpg': '🖼', '.jpeg': '🖼', '.gif': '🖼', '.svg': '🎯',
+  '.sh': '💻', '.bat': '💻', '.ps1': '💻',
+  '.jar': '📦', '.zip': '📦', '.tar': '📦', '.gz': '📦',
+  '.sql': '🗄', '.properties': '⚙', '.gitignore': '🙈',
+  '.kt': '☕', '.go': '🔵', '.rs': '🦀', '.c': '⚡', '.cpp': '⚡', '.h': '⚡',
+  '.lock': '🔒', '.toml': '⚙', '.cfg': '⚙', '.ini': '⚙',
+};
+
+function fileIcon(name, type){
+  if (type === 'dir') return fileIcons.dir;
+  const dot = name.lastIndexOf('.');
+  if (dot > 0) return fileIcons[name.slice(dot)] || fileIcons.file;
+  return fileIcons.file;
+}
+
+async function loadDir(path){
+  fpTree._currentPath = path || '';
+  fpTree.innerHTML = '<div class="fpempty">Loading…</div>';
+  let data;
+  try {
+    const url = '/api/files' + (path ? '?path=' + encodeURIComponent(path) : '');
+    data = await (await fetch(url)).json();
+  } catch (e) {
+    fpTree.innerHTML = '<div class="fpempty">Failed to load</div>';
+    return;
+  }
+  if (data.error){ fpTree.innerHTML = '<div class="fpempty">'+escapeHtml(data.error)+'</div>'; return; }
+
+  fpTree.innerHTML = '';
+  // Parent directory link
+  if (data.parent != null){
+    const pe = document.createElement('div'); pe.className = 'fpent dir';
+    pe.innerHTML = '<span class="fpicon">📂</span><span class="fpname">..</span>';
+    pe.onclick = () => loadDir(data.parent);
+    fpTree.appendChild(pe);
+  }
+  if (!data.entries || !data.entries.length){
+    const e = document.createElement('div'); e.className = 'fpempty'; e.textContent = '(empty)';
+    fpTree.appendChild(e);
+    return;
+  }
+  for (const ent of data.entries){
+    const row = document.createElement('div');
+    row.className = 'fpent ' + (ent.type === 'dir' ? 'dir' : '');
+    const icon = fileIcon(ent.name, ent.type);
+    const sz = ent.type === 'file' ? ('<span class="fpsize">'+fmtSize(ent.size)+'</span>') : '';
+    row.innerHTML = '<span class="fpicon">'+icon+'</span><span class="fpname">'+escapeHtml(ent.name)+'</span>'+sz;
+    row.title = ent.name + (ent.type === 'file' ? '  ('+fmtSize(ent.size)+')' : '');
+
+    if (ent.type === 'dir'){
+      let childrenLoaded = false;
+      const wrapper = document.createElement('div');
+      const children = document.createElement('div'); children.className = 'fpchildren collapsed';
+      row.onclick = async (e) => {
+        e.stopPropagation();
+        if (!childrenLoaded){
+          row.classList.add('loading');
+          await loadChildren(data.path + '/' + ent.name, children);
+          row.classList.remove('loading');
+          childrenLoaded = true;
+        }
+        children.classList.toggle('collapsed');
+      };
+      wrapper.appendChild(row);
+      wrapper.appendChild(children);
+      fpTree.appendChild(wrapper);
+    } else {
+      row.onclick = () => {
+        // highlight selection
+        fpTree.querySelectorAll('.fpent.selected').forEach(el => el.classList.remove('selected'));
+        row.classList.add('selected');
+      };
+      fpTree.appendChild(row);
+    }
+  }
+}
+
+async function loadChildren(dirPath, container){
+  container.innerHTML = '<div class="fpempty">…</div>';
+  let data;
+  try { data = await (await fetch('/api/files?path=' + encodeURIComponent(dirPath))).json(); }
+  catch (e) { container.innerHTML = ''; return; }
+  if (data.error || !data.entries){ container.innerHTML = ''; return; }
+  container.innerHTML = '';
+  for (const ent of data.entries){
+    const row = document.createElement('div');
+    row.className = 'fpent ' + (ent.type === 'dir' ? 'dir' : '');
+    const icon = fileIcon(ent.name, ent.type);
+    const sz = ent.type === 'file' ? ('<span class="fpsize">'+fmtSize(ent.size)+'</span>') : '';
+    row.innerHTML = '<span class="fpicon">'+icon+'</span><span class="fpname">'+escapeHtml(ent.name)+'</span>'+sz;
+    row.title = ent.name;
+
+    if (ent.type === 'dir'){
+      let subLoaded = false;
+      const wrapper = document.createElement('div');
+      const subChildren = document.createElement('div'); subChildren.className = 'fpchildren collapsed';
+      row.onclick = async (e) => {
+        e.stopPropagation();
+        if (!subLoaded){
+          row.classList.add('loading');
+          await loadChildren(data.path + '/' + ent.name, subChildren);
+          row.classList.remove('loading');
+          subLoaded = true;
+        }
+        subChildren.classList.toggle('collapsed');
+      };
+      wrapper.appendChild(row); wrapper.appendChild(subChildren);
+      container.appendChild(wrapper);
+    } else {
+      row.onclick = () => {
+        fpTree.querySelectorAll('.fpent.selected').forEach(el => el.classList.remove('selected'));
+        row.classList.add('selected');
+      };
+      container.appendChild(row);
+    }
+  }
+}
+
+// Auto-refresh file tree when workdir changes
+const _origApplyWorkdir = applyWorkdir;
+applyWorkdir = async function(val){
+  const ok = await _origApplyWorkdir(val);
+  if (ok && filePanelVisible) loadDir('');
+  return ok;
+};
+</script>
+</body>
+</html>

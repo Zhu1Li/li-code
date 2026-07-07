@@ -1,0 +1,170 @@
+﻿<svg width="100%" viewBox="0 0 1000 760" role="img" xmlns="http://www.w3.org/2000/svg">
+  <title>LiCode 生命周期分层架构图</title>
+  <desc>这张图按生命周期和所有权组织 LiCode：UI 层接收用户输入并展示流式事件；LiRuntime 是进程内常驻编排中心，持有会话、记忆、LLM 客户端、工具注册表、MCP 和 Skill；每条用户消息通过 ask 新建一个 Agent 实例，Agent 内部的 AgentLoop 多次迭代调用 LLM 与工具；ToolRegistry 由 Runtime 持有，AgentLoop 每轮只读取 schema，不负责注册。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5f5e5a"/>
+    </marker>
+    <style>
+      .title { font: 700 20px -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif; fill: #2c2c2a; }
+      .subtitle { font: 12px -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif; fill: #5f5e5a; }
+      .h { font: 700 15px -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif; }
+      .t { font: 600 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif; }
+      .s { font: 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif; }
+      .xs { font: 10px -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif; }
+      .line { stroke: #5f5e5a; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .dash { stroke: #888780; stroke-width: 1.6; stroke-dasharray: 5 5; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1000" height="760" fill="#fbfaf7"/>
+  <!-- <text x="500" y="32" text-anchor="middle" class="title">LiCode 生命周期分层架构图</text> -->
+  <!-- <text x="500" y="52" text-anchor="middle" class="subtitle">常驻 Runtime · 每条用户消息 new Agent · AgentLoop 内部多次 LLM↔Tool 迭代 · ToolRegistry 启动注册、循环只读</text> -->
+
+  <!-- UI -->
+  <rect x="35" y="82" width="180" height="182" rx="12" fill="#e6f1fb" stroke="#185fa5" stroke-width="1.6"/>
+  <text x="50" y="106" class="h" fill="#042c53">UI 层</text>
+  <rect x="52" y="122" width="146" height="38" rx="8" fill="#b5d4f4" stroke="#185fa5"/>
+  <text x="125" y="146" text-anchor="middle" class="t" fill="#042c53">用户输入</text>
+  <rect x="52" y="168" width="146" height="42" rx="8" fill="#b5d4f4" stroke="#185fa5"/>
+  <text x="125" y="186" text-anchor="middle" class="t" fill="#042c53">Web / GUI / TUI</text>
+  <text x="125" y="202" text-anchor="middle" class="s" fill="#0c447c">多端入口</text>
+  <rect x="52" y="218" width="146" height="32" rx="8" fill="#b5d4f4" stroke="#185fa5"/>
+  <text x="125" y="239" text-anchor="middle" class="t" fill="#042c53">StreamCallback</text>
+
+  <!-- Runtime -->
+  <rect x="250" y="82" width="300" height="360" rx="12" fill="#eeedfe" stroke="#534ab7" stroke-width="1.6"/>
+  <text x="268" y="106" class="h" fill="#26215c">LiRuntime 常驻装配工厂</text>
+  <text x="268" y="124" class="s" fill="#3c3489">启动时 create() 一次性装配</text>
+
+  <rect x="268" y="140" width="120" height="48" rx="8" fill="#cecbf6" stroke="#534ab7"/>
+  <text x="328" y="160" text-anchor="middle" class="t" fill="#26215c">LlmClient</text>
+  <text x="328" y="176" text-anchor="middle" class="s" fill="#3c3489">连接复用</text>
+  <rect x="400" y="140" width="132" height="48" rx="8" fill="#cecbf6" stroke="#534ab7"/>
+  <text x="466" y="160" text-anchor="middle" class="t" fill="#26215c">ConversationManager</text>
+  <text x="466" y="176" text-anchor="middle" class="s" fill="#3c3489">工作记忆 List</text>
+
+  <rect x="268" y="198" width="120" height="48" rx="8" fill="#cecbf6" stroke="#534ab7"/>
+  <text x="328" y="218" text-anchor="middle" class="t" fill="#26215c">SessionManager</text>
+  <text x="328" y="234" text-anchor="middle" class="s" fill="#3c3489">JSONL 存档</text>
+  <rect x="400" y="198" width="132" height="48" rx="8" fill="#cecbf6" stroke="#534ab7"/>
+  <text x="466" y="218" text-anchor="middle" class="t" fill="#26215c">MemoryManager</text>
+  <text x="466" y="234" text-anchor="middle" class="s" fill="#3c3489">跨会话长期记忆</text>
+
+  <rect x="268" y="256" width="264" height="58" rx="8" fill="#cecbf6" stroke="#534ab7"/>
+  <text x="400" y="278" text-anchor="middle" class="t" fill="#26215c">ToolRegistry</text>
+  <text x="400" y="294" text-anchor="middle" class="s" fill="#3c3489">Runtime 持有的统一工具表</text>
+  <text x="400" y="309" text-anchor="middle" class="xs" fill="#3c3489">本地工具 / MCP / LoadSkill / AgentTool / Team</text>
+
+  <rect x="268" y="326" width="120" height="46" rx="8" fill="#cecbf6" stroke="#534ab7"/>
+  <text x="328" y="346" text-anchor="middle" class="t" fill="#26215c">McpManager</text>
+  <text x="328" y="362" text-anchor="middle" class="s" fill="#3c3489">启动连接</text>
+  <rect x="400" y="326" width="132" height="46" rx="8" fill="#cecbf6" stroke="#534ab7"/>
+  <text x="466" y="346" text-anchor="middle" class="t" fill="#26215c">SkillCatalog</text>
+  <text x="466" y="362" text-anchor="middle" class="s" fill="#3c3489">目录启动 / 正文按需</text>
+
+  <rect x="268" y="384" width="264" height="42" rx="8" fill="#cecbf6" stroke="#534ab7"/>
+  <text x="400" y="410" text-anchor="middle" class="t" fill="#26215c">HookEngine / PermissionChecker</text>
+
+  <!-- ask bridge -->
+  <rect x="585" y="118" width="145" height="72" rx="12" fill="#faeeda" stroke="#854f0b" stroke-width="1.5"/>
+  <text x="657" y="141" text-anchor="middle" class="t" fill="#412402">ask(userMessage)</text>
+  <text x="657" y="158" text-anchor="middle" class="s" fill="#633806">每条用户消息一次</text>
+  <text x="657" y="175" text-anchor="middle" class="s" fill="#633806">接线 + 注入上下文</text>
+
+  <!-- Agent -->
+  <rect x="760" y="82" width="205" height="360" rx="12" fill="#eaf3de" stroke="#3b6d11" stroke-width="1.6"/>
+  <text x="778" y="106" class="h" fill="#173404">Agent 实例</text>
+  <text x="778" y="124" class="s" fill="#27500a">每条用户消息 new，用完即弃</text>
+  <rect x="778" y="140" width="169" height="272" rx="10" fill="#c0dd97" stroke="#3b6d11"/>
+  <text x="862" y="163" text-anchor="middle" class="t" fill="#173404">AgentLoop</text>
+  <text x="862" y="180" text-anchor="middle" class="s" fill="#27500a">🔁 ≤ max_iterations</text>
+
+  <rect x="796" y="194" width="132" height="34" rx="7" fill="#eaf3de" stroke="#3b6d11"/>
+  <text x="862" y="216" text-anchor="middle" class="t" fill="#173404">1 注入提醒</text>
+  <rect x="796" y="236" width="132" height="34" rx="7" fill="#eaf3de" stroke="#3b6d11"/>
+  <text x="862" y="258" text-anchor="middle" class="t" fill="#173404">2 上下文管理</text>
+  <rect x="796" y="278" width="132" height="34" rx="7" fill="#eaf3de" stroke="#3b6d11"/>
+  <text x="862" y="300" text-anchor="middle" class="t" fill="#173404">3 读取 tools schema</text>
+  <rect x="796" y="320" width="132" height="34" rx="7" fill="#eaf3de" stroke="#3b6d11"/>
+  <text x="862" y="342" text-anchor="middle" class="t" fill="#173404">4 调用 LLM</text>
+  <rect x="796" y="362" width="132" height="34" rx="7" fill="#eaf3de" stroke="#3b6d11"/>
+  <text x="862" y="384" text-anchor="middle" class="t" fill="#173404">5 tool_use / 文本</text>
+
+  <!-- Tool layer -->
+  <rect x="35" y="485" width="930" height="140" rx="12" fill="#e1f5ee" stroke="#0f6e56" stroke-width="1.6"/>
+  <text x="53" y="510" class="h" fill="#04342c">统一工具执行层</text>
+  <!-- <text x="53" y="528" class="s" fill="#085041">工具启动时注册进 Runtime 的 ToolRegistry；AgentLoop 每轮只读取 schema，模型通过独立 tools 字段感知</text> -->
+
+  <rect x="58" y="545" width="135" height="54" rx="8" fill="#9fe1cb" stroke="#0f6e56"/>
+  <text x="126" y="568" text-anchor="middle" class="t" fill="#04342c">本地工具</text>
+  <text x="126" y="586" text-anchor="middle" class="s" fill="#085041">Read / Edit / Bash</text>
+  <rect x="208" y="545" width="135" height="54" rx="8" fill="#9fe1cb" stroke="#0f6e56"/>
+  <text x="276" y="568" text-anchor="middle" class="t" fill="#04342c">MCP 工具</text>
+  <text x="276" y="586" text-anchor="middle" class="s" fill="#085041">JSON-RPC</text>
+  <rect x="358" y="545" width="135" height="54" rx="8" fill="#9fe1cb" stroke="#0f6e56"/>
+  <text x="426" y="568" text-anchor="middle" class="t" fill="#04342c">LoadSkill</text>
+  <text x="426" y="586" text-anchor="middle" class="s" fill="#085041">按需加载 SOP</text>
+  <rect x="508" y="545" width="135" height="54" rx="8" fill="#9fe1cb" stroke="#0f6e56"/>
+  <text x="576" y="568" text-anchor="middle" class="t" fill="#04342c">AgentTool</text>
+  <text x="576" y="586" text-anchor="middle" class="s" fill="#085041">派 SubAgent</text>
+  <rect x="658" y="545" width="135" height="54" rx="8" fill="#9fe1cb" stroke="#0f6e56"/>
+  <text x="726" y="568" text-anchor="middle" class="t" fill="#04342c">Team 工具</text>
+  <text x="726" y="586" text-anchor="middle" class="s" fill="#085041">SendMessage / Task</text>
+  <rect x="808" y="545" width="135" height="54" rx="8" fill="#9fe1cb" stroke="#0f6e56"/>
+  <text x="876" y="568" text-anchor="middle" class="t" fill="#04342c">Worktree</text>
+  <text x="876" y="586" text-anchor="middle" class="s" fill="#085041">隔离副本</text>
+
+  <!-- <rect x="58" y="612" width="885" height="20" rx="6" fill="#c7efe0" stroke="#0f6e56"/> -->
+  <!-- <text x="500" y="626" text-anchor="middle" class="xs" fill="#085041">注意：AgentTool 是 ToolRegistry 里的一个工具；ToolRegistry 是 Runtime 持有的容器，不属于 AgentLoop</text> -->
+
+  <!-- external -->
+  <!-- <rect x="35" y="650" width="930" height="58" rx="12" fill="#fcebeb" stroke="#a32d2d" stroke-width="1.6"/>
+  <text x="53" y="675" class="h" fill="#501313">外部资源</text>
+  <text x="168" y="675" class="t" fill="#501313">LLM API</text>
+  <text x="310" y="675" class="t" fill="#501313">MCP Server</text>
+  <text x="478" y="675" class="t" fill="#501313">Shell / 文件系统</text>
+  <text x="688" y="675" class="t" fill="#501313">Git Worktree</text>
+  <text x="53" y="695" class="s" fill="#791f1f">外部世界可能慢、失败或返回大结果；LiCode 通过权限、Hook、工具错误回灌、上下文压缩与会话落盘兜底。</text> -->
+
+  <rect x="180" y="650" width="650" height="94" rx="10" fill="#FCEBEB" stroke="#A32D2D" stroke-width="1.5"/>
+  <text x="194" y="670" font-size="14" font-weight="600" fill="#501313">外部服务 / 系统资源</text>
+  <rect x="196" y="680" width="142" height="52" rx="8" fill="#F7C1C1" stroke="#A32D2D"/>
+  <text x="267" y="702" text-anchor="middle" font-size="13" font-weight="600" fill="#501313">LLM 大模型</text>
+  <text x="267" y="720" text-anchor="middle" font-size="11" fill="#791F1F">Anthropic/OpenAI</text>
+
+  <rect x="346" y="680" width="142" height="52" rx="8" fill="#F7C1C1" stroke="#A32D2D"/>
+  <text x="417" y="702" text-anchor="middle" font-size="13" font-weight="600" fill="#501313">MCP Server</text>
+  <text x="417" y="720" text-anchor="middle" font-size="11" fill="#791F1F">JSON-RPC</text>
+
+  <rect x="496" y="680" width="142" height="52" rx="8" fill="#F7C1C1" stroke="#A32D2D"/>
+  <text x="567" y="702" text-anchor="middle" font-size="13" font-weight="600" fill="#501313">Git Worktree</text>
+  <text x="567" y="720" text-anchor="middle" font-size="11" fill="#791F1F">隔离副本</text>
+
+  <rect x="646" y="680" width="142" height="52" rx="8" fill="#F7C1C1" stroke="#A32D2D"/>
+  <text x="717" y="702" text-anchor="middle" font-size="13" font-weight="600" fill="#501313">Shell · 文件系统</text>
+  <text x="717" y="720" text-anchor="middle" font-size="11" fill="#791F1F">命令 / 读写</text>
+
+  <!-- arrows -->
+  <path class="line" d="M215,172 L250,172"/>
+  <text x="226" y="160" class="xs" fill="#5f5e5a">输入</text>
+  <path class="line" d="M550,154 L585,154"/>
+  <path class="line" d="M730,154 L760,154"/>
+  <path class="dash" d="M400,314 C520,385 710,280 796,294"/>
+  <text x="570" y="318" class="xs" fill="#5f5e5a">schema</text>
+  <path class="line" d="M532,176 C600,222 700,240 795,253"/>
+  <text x="625" y="218" class="xs" fill="#5f5e5a">messages</text>
+  <path class="line" d="M862,396 C862,450 720,455 695,485"/>
+  <text x="772" y="460" class="xs" fill="#5a5a5f">tool_use</text>
+  <path class="line" d="M500,485 C560,430 570,220 466,188"/>
+  <text x="550" y="352" class="xs" fill="#5f5e5a">tool_result</text>
+  <path class="dash" d="M350,198 C380,184 414,190 430,188"/>
+  <text x="345" y="190" class="xs" fill="#5f5e5a">resume</text>
+  <path class="dash" d="M350,138 C620,30 885,54 885,140"/>
+  <text x="700" y="78" class="xs" fill="#5f5e5a">复用</text>
+  <path class="line" d="M760,420 C640,490 215,458 125,250"/>
+  <text x="420" y="452" class="xs" fill="#5f5e5a">AgentEvent</text>
+
+  <!-- lifecycle footer -->
+  <!-- <text x="35" y="752" class="s" fill="#5f5e5a">生命周期：Runtime 常驻；ask 每条用户消息一次；主 Agent 每条用户消息 new；AgentLoop 是 Agent 内部迭代；工具确认不 new Agent，AgentTool/Team 会按需另起子 Agent。</text> -->
+</svg>

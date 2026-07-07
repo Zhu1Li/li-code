@@ -1,0 +1,171 @@
+# =============================================================================
+# LiCode 配置文件参考
+# =============================================================================
+#
+# 文件位置（按优先级合并，项目级覆盖用户级）:
+#   1. ~/.licode/config.yaml      — 用户全局配置（所有项目共用）
+#   2. ./.licode/config.yaml      — 项目级覆盖（当前工作目录下）
+#
+# 合并规则: providers / mcp_servers / hooks 三个字段，项目级若非空则整组替换用户级。
+#
+# API Key 读取优先级:
+#   provider.api_key → 环境变量 → 空字符串（部分服务端不校验）
+#   环境变量映射: anthropic→ANTHROPIC_API_KEY, openai/openai-compat→OPENAI_API_KEY
+#
+# =============================================================================
+
+# ---- Providers（至少一个） ----
+providers:
+  # Anthropic 协议（推荐用于 Claude 系列模型）
+  - name: anthropic-claude          # 必填，任意别名，GUI 中显示
+    protocol: anthropic             # 必填，anthropic | openai | openai-compat
+    base_url: https://api.anthropic.com  # 必填
+    model: claude-sonnet-4-6-20250514    # 必填，模型 ID
+    api_key:                        # 可选，留空则从环境变量读取
+    thinking: true                  # 可选，默认 false（仅 Claude 模型支持 extended thinking）
+    context_window: 200000          # 可选，不填则自动探测（模型名匹配 → 200000 兜底）
+    max_output_tokens: 64000        # 可选，thinking=true 默认 64000，false 默认 8192
+
+  # OpenAI 协议
+  - name: openai-gpt4o
+    protocol: openai
+    base_url: https://api.openai.com/v1
+    model: gpt-4o
+    # api_key:
+    # thinking: false               # OpenAI 模型忽略此字段
+    # context_window: 128000
+    # max_output_tokens: 16384
+
+  # OpenAI 兼容协议（DeepSeek / 通义千问 / 本地模型 等）
+  - name: deepseek-v4
+    protocol: openai-compat
+    base_url: https://api.deepseek.com/v1
+    model: deepseek-v4-pro
+    # api_key:
+    # thinking: false
+    # context_window: 128000
+    # max_output_tokens: 8192
+
+# ---- MCP Servers（可选） ----
+mcp_servers:
+  # stdio 类型: 本地启动子进程
+  - name: context7                  # 必填
+    command: npx                    # 必填（与 url 二选一）
+    args: ["-y", "@upstash/context7-mcp"]  # 可选，命令行参数列表
+    # env:                          # 可选，注入进程的环境变量
+    #   NODE_ENV: production
+
+  # HTTP 类型: 连接远程 SSE 端点
+  # - name: remote-server
+  #   url: http://localhost:8080/sse      # 必填（与 command 二选一）
+  #   headers:                      # 可选，自定义 HTTP 请求头
+  #     Authorization: Bearer sk-xxx
+  #     X-Custom: value
+
+# ---- Hooks（可选） ----
+hooks:
+  # ── 事件名 ──
+  # startup         应用启动
+  # shutdown        应用关闭
+  # session_start   每次新会话开始
+  # session_end     每次会话结束
+  # turn_start      每轮对话开始（用户发送消息后）
+  # turn_end        每轮对话结束（AI 回复完成后）
+  # pre_send        发送消息给 LLM 前
+  # post_receive    收到 LLM 回复后
+  # pre_tool_use    工具执行前
+  # post_tool_use   工具执行后
+  # error           发生错误时
+  # compact         上下文压缩时
+
+  # ── 条件运算符 ──
+  # ==      精确匹配
+  # !=      不等于
+  # =~      正则匹配（Java Pattern）
+  # =*      通配符匹配（glob，如 ** / .env）
+  # in      包含于列表
+
+  # ── 动作类型 ──
+  # command  执行 Shell 命令
+  # prompt   注入提示消息到 LLM 上下文
+  # http     发送 HTTP 请求（无返回值）
+  # agent    委托 Agent 处理
+
+  # ── 模板变量（{{variable}} 语法）──
+  # 命令和消息中可用: {{event}} {{tool}} {{tool_input}} {{tool_output}} {{error}}
+  # 也可引用 condition 中 rules 的 variable 名
+
+  # ---- 示例 1: 对话日志（TURN_START + command） ----
+  - id: log-turn
+    event: turn_start
+    action:
+      type: command
+      command: 'echo [$(date)] Turn started >> .licode/hooks.log'
+    timeout: 5                     # 秒，超时则跳过
+
+  # ---- 示例 2: 拦截危险命令（pre_tool_use + reject + 条件） ----
+  - id: block-rm-rf
+    event: pre_tool_use
+    condition:
+      mode: all                    # all=全部满足, any=任一满足
+      rules:
+        - variable: tool
+          operator: ==
+          value: Bash
+        - variable: args.command
+          operator: "=~"
+          value: ".*rm\\s+-rf.*"
+    action:
+      type: prompt
+      message: "Blocked dangerous rm -rf command."
+    reject: true                   # 拒绝执行工具
+    timeout: 5
+
+  # ---- 示例 3: 工具使用统计（post_tool_use + async） ----
+  - id: track-tool-usage
+    event: post_tool_use
+    action:
+      type: command
+      command: 'echo [$(date)] tool={{tool}} >> .licode/tool-stats.log'
+    async: true                    # 异步执行，不阻塞主流程
+    timeout: 5
+
+  # ---- 示例 4: 敏感文件拦截（pre_tool_use + glob 匹配） ----
+  - id: warn-env-file
+    event: pre_tool_use
+    condition:
+      mode: all
+      rules:
+        - variable: tool
+          operator: ==
+          value: Read
+        - variable: file_path
+          operator: "=*"
+          value: "**/.env"
+    action:
+      type: prompt
+      message: "Warning: about to read a .env file."
+    reject: true
+
+  # ---- 示例 5: 启动欢迎（startup + once + prompt） ----
+  - id: welcome-once
+    event: startup
+    action:
+      type: prompt
+      message: "Hooks are active! This fires once per session."
+    once: true                     # 每个会话只触发一次
+
+  # ---- 示例 6: HTTP 通知（turn_start + http GET） ----
+  # - id: notify-webhook
+  #   event: turn_start
+  #   action:
+  #     type: http
+  #     url: http://localhost:8085/api/notify
+  #     method: GET
+  #     # headers:                   # 可选，自定义请求头
+  #     #   X-Auth: token123
+  #   timeout: 10
+
+# ---- Features（可选，功能开关） ----
+features:
+  COORDINATOR_MODE: true           # 开启 Teammate 协调模式（多 Agent 协作）

@@ -1,0 +1,11 @@
+# Fixed SWE-bench-Live subset for the LiCode eval + compaction ablation (N=20–30).
+# One instance_id per line. Commit this file so both baseline and ablation runs
+# use the IDENTICAL instances (required for the paired McNemar comparison).
+#
+# Fill this in after choosing a subset, e.g. via:
+#   python -c "from datasets import load_dataset as L; \
+#     [print(r['instance_id']) for r in L('SWE-bench-Live/SWE-bench-Live', split='test').select(range(30))]"
+#   (CONFIRM the dataset id/split against https://swe-bench-live.github.io/)
+#
+# Prefer a stratified sample (mix of repos + difficulty) over the first N.
+# Lines starting with '#' and blank lines are ignored.
