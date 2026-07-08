@@ -166,6 +166,24 @@ Li Code 是一个用 **Java 从零实现**的终端 **Coding Agent**——类似
 
 完整设计文档(数据流、工具流水线、全部异常兜底)：**[`docs/architecture.md`](./docs/architecture.md)**。
 
+### 核心特性
+
+| 能力                        | 功能描述                                                     | 所在位置                                           |
+| :-------------------------- | :----------------------------------------------------------- | :------------------------------------------------- |
+| **双协议接入**              | 支持 Anthropic、OpenAI 及兼容 OpenAI 的接口，支持带思考过程的流式传输 | `llm/`                                             |
+| **ReAct 智能体循环**        | 工具结果以 `user` 消息形式反馈，推动下一轮对话；错误结果附带 `is_error` 标记，使模型能够自我纠正 | `agent/`、`conversation/`                          |
+| **上下文工程**              | 两层机制：L1 将过大的工具结果溢出到磁盘并每轮裁剪；L2 仅对过去约 80% 窗口使用量的上下文做摘要 | `toolresult/`、`compact/ContextCompactor`          |
+| **幂等卸载（“决策冻结”）**  | 每个溢出的工具结果最多被重写为一个简短存根一次，之后便被冻结——保持提示前缀稳定以利于缓存 | `toolresult/ContentReplacement*`                   |
+| **保真恢复**                | L2 摘要后，重新附加最近读取的文件和活跃的技能，避免智能体对丢失状态产生幻觉 | `compact/RecoveryState`                            |
+| **MCP + 懒加载工具**        | 通过 stdio/SSE/HTTP 接入 MCP 服务器；数百个工具通过按需调用的 `ToolSearch` 不淹没上下文 | `mcp/`、`tool/impl/ToolSearchTool`                 |
+| **跨会话记忆**              | 自动提取用户偏好/纠正/项目事实并持久化到磁盘；新会话会继承这些信息。`/style-scan` 还会分析代码库的约定规范，通用的 `SaveMemory` 工具让智能体能自行保存长效事实 | `memory/MemoryManager`、`tool/impl/SaveMemoryTool` |
+| **多智能体**                | 一次性子智能体（工具白名单控制）以及常驻团队（邮箱 + 共享任务） | `subagent/`、`team/`                               |
+| **测试自我修复 + 故障记忆** | `/fix-tests` 在隔离的分支子智能体中执行“运行→分析→修复→重新运行”循环直至通过；每次修复都被提炼到可关键字搜索的故障存储中（`RecallFailures`/`RecordFailure`），下次遇到相似缺陷时能被回忆起来 | `failure/`、`skills/builtins/fix-tests`            |
+| **Git 工作树隔离**          | 子智能体在通过 `git worktree add` 创建的独立分支副本中运行；更改不会触及父工作树，不自动合并 → 无自动冲突 | `worktree/`                                        |
+| **权限矩阵 + 钩子**         | `PermissionMode × ToolCategory` 决定允许/询问/拒绝；12 个生命周期钩子事件可拦截危险调用 | `permission/`、`hook/`                             |
+| **计划模式与技能**          | 只读的计划模式；可复用的技能包（启动时加载目录，按需加载主体内容） | `plan/`、`skill/`                                  |
+| **评估框架**                | SWE-bench-Live 运行器及[结果](https://./harbor/RESULTS.md)：35% 解决率（N=20），统计上与 Claude Code 持平 | `harbor/`                                          |
+
 ### 设计亮点
 
 - **上下文工程:先落盘,再压缩。** 压缩有损、频繁压缩会让任务失真,所以尽量推迟。**L1**(每轮、廉价)把超长工具结果落盘到 `.licode/tool_results`，只留短头部 + "需要请读该文件"的指针,模型可按需范围读回；**L2**(调 LLM 摘要、昂贵)只在窗口用量超 ~80% 时触发,之后由 `RecoveryState` 把最近读过的文件与激活的 Skill 贴回,保住保真度。
