@@ -182,7 +182,7 @@ Li Code 是一个用 **Java 从零实现**的终端 **Coding Agent**——类似
 | **Git 工作树隔离**          | 子智能体在通过 `git worktree add` 创建的独立分支副本中运行；更改不会触及父工作树，不自动合并 → 无自动冲突 | `worktree/`                                        |
 | **权限矩阵 + 钩子**         | `PermissionMode × ToolCategory` 决定允许/询问/拒绝；12 个生命周期钩子事件可拦截危险调用 | `permission/`、`hook/`                             |
 | **计划模式与技能**          | 只读的计划模式；可复用的技能包（启动时加载目录，按需加载主体内容） | `plan/`、`skill/`                                  |
-| **评估框架**                | SWE-bench-Live 运行器及[结果](https://./harbor/RESULTS.md)：35% 解决率（N=20），统计上与 Claude Code 持平 | `harbor/`                                          |
+| **评估框架**                | SWE-bench-Live 运行器及[结果](./harbor/RESULTS.md)：35% 解决率（N=20），统计上与 Claude Code 持平 | `harbor/`                                          |
 
 ### 设计亮点
 
