@@ -447,4 +447,59 @@ class AgentTest {
         assertEquals(0, (int) fake.toolCountPerCall.get(2), "Wrap-up turn must pass zero tools");
         assertTrue(fake.toolCountPerCall.get(0) >= 1, "Normal turns must have tools available");
     }
+
+    // ── goal-drift checkpoint ─────────────────────────────────────────
+
+    @Test
+    void testGoalCheckpointInjectedOnLongTask() {
+        var conv = new ConversationManager();
+        conv.addUserMessage("Refactor the auth module end to end");
+
+        var fake = new FakeLlmClient();
+        // 12 turns of text + a successful tool call → runs >10 iterations without
+        // tripping the text-less guard; at iteration 10 the goal checkpoint fires.
+        for (int i = 0; i < 12; i++) {
+            fake.addResponse(
+                    new StreamEvent.TextDelta("step " + i),
+                    new StreamEvent.ToolCallStart("call_" + i, "Echo"),
+                    new StreamEvent.ToolCallDelta("call_" + i, "{\"msg\":\"x\"}"),
+                    new StreamEvent.ToolCallComplete("call_" + i, "Echo", Map.of("msg", "x")),
+                    new StreamEvent.StreamEnd("tool_use", 10, 5));
+        }
+
+        var reg = new ToolRegistry();
+        reg.register(new EchoTool());
+        var agent = new Agent(fake, reg, "anthropic");
+        drain(agent.run(conv), 15);
+
+        assertTrue(conv.getMessages().stream().anyMatch(m ->
+                        m.getContent() != null && m.getContent().contains("<goal-check>")
+                                && m.getContent().contains("Refactor the auth module")),
+                "Expected a <goal-check> re-anchor injected on a long task");
+    }
+
+    @Test
+    void testGoalCheckpointNotInjectedOnShortTask() {
+        var conv = new ConversationManager();
+        conv.addUserMessage("echo hi");
+
+        var fake = new FakeLlmClient();
+        fake.addResponse(
+                new StreamEvent.ToolCallStart("call_1", "Echo"),
+                new StreamEvent.ToolCallDelta("call_1", "{\"msg\":\"hi\"}"),
+                new StreamEvent.ToolCallComplete("call_1", "Echo", Map.of("msg", "hi")),
+                new StreamEvent.StreamEnd("tool_use", 10, 5));
+        fake.addResponse(
+                new StreamEvent.TextDelta("done"),
+                new StreamEvent.StreamEnd("end_turn", 5, 3));
+
+        var reg = new ToolRegistry();
+        reg.register(new EchoTool());
+        var agent = new Agent(fake, reg, "anthropic");
+        drain(agent.run(conv), 10);
+
+        assertFalse(conv.getMessages().stream().anyMatch(m ->
+                        m.getContent() != null && m.getContent().contains("<goal-check>")),
+                "Short task (<10 iters) must not get a goal-check");
+    }
 }

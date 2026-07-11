@@ -184,6 +184,8 @@ public class Agent {
         int textLessIterations = 0;
         final int MAX_TEXT_LESS_ITERATIONS = 8;
         boolean wrapUpDone = false;   // forced wrap-up turn used at most once
+        // 目标漂移检查点：循环前锚定"最初的任务"，长任务里周期性重锚。
+        String taskGoal = GoalCheckpoint.captureGoal(conv.getMessages());
 
         for (int iteration = 1; ; iteration++) {
             if (Thread.currentThread().isInterrupted() || cancelled) break;
@@ -218,6 +220,11 @@ public class Agent {
 
             if (planOnlyMode) {
                 conv.addSystemReminder(PlanModePrompt.buildReminder(iteration, false));
+            }
+
+            // 目标重锚：每隔 CHECK_INTERVAL 轮把最初的任务贴回，抵抗 goal drift。
+            if (taskGoal != null && GoalCheckpoint.shouldCheck(iteration)) {
+                conv.addSystemReminder(GoalCheckpoint.buildReminder(taskGoal, iteration));
             }
 
             // Inject background task notifications
