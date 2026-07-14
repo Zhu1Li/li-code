@@ -125,6 +125,11 @@ public class Agent {
         return recoveryState;
     }
 
+    /** Circuit-breaker state for auto-compaction; reset by a successful force compaction. */
+    public ContextCompactor.AutoCompactTrackingState getCompactTracking() {
+        return compactTracking;
+    }
+
     public void setContextWindow(int contextWindow) {
         this.contextWindow = contextWindow;
     }
@@ -401,7 +406,8 @@ public class Agent {
                                                 "Context too long, compacting..."));
                                         try {
                                             String result = ContextCompactor.forceCompact(
-                                                    conv, client, contextWindow, workDir, recoveryState);
+                                                    conv, client, contextWindow, workDir, recoveryState,
+                                                    compactTracking);
                                             putSafe(queue, new AgentEvent.StreamText("\n" + result + "\n"));
                                         } catch (Exception compactErr) {
                                             putSafe(queue, new AgentEvent.ErrorEvent(

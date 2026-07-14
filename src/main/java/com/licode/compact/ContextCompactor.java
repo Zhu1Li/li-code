@@ -176,7 +176,7 @@ public final class ContextCompactor {
         }
 
         if (tokens >= computeCompactThreshold(contextWindow, maxOutput, true)) {
-            return forceCompact(conv, client, contextWindow, workDir, recovery);
+            return forceCompact(conv, client, contextWindow, workDir, recovery, tracking);
         }
 
         if (tracking == null || !tracking.isTripped()) {
@@ -194,7 +194,28 @@ public final class ContextCompactor {
     /** Force a full auto-compact regardless of current token usage. */
     public static String forceCompact(ConversationManager conv, LlmClient client, int contextWindow,
                                       String workDir, RecoveryState recovery) {
-        return autoCompact(conv, client, contextWindow, workDir, recovery);
+        return forceCompact(conv, client, contextWindow, workDir, recovery, null);
+    }
+
+    /**
+     * Force a full auto-compact regardless of current token usage.
+     *
+     * <p>On success this resets the auto-compact circuit breaker ({@code tracking}),
+     * so that a manual {@code /compact}, a resume-time compaction, or an
+     * error-driven force compaction restores automatic compaction after it has
+     * tripped. Without this, once auto-compaction trips the breaker
+     * ({@link AutoCompactTrackingState#isTripped()} stays true), the soft/hard
+     * threshold band that calls {@link #reset()} is never re-entered and the
+     * process never recovers automatic compaction on its own.
+     *
+     * @param tracking the circuit-breaker state to reset on success; may be null
+     */
+    public static String forceCompact(ConversationManager conv, LlmClient client, int contextWindow,
+                                      String workDir, RecoveryState recovery,
+                                      AutoCompactTrackingState tracking) {
+        String result = autoCompact(conv, client, contextWindow, workDir, recovery);
+        if (tracking != null) tracking.reset();
+        return result;
     }
 
     /**

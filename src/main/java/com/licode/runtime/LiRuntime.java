@@ -1310,7 +1310,8 @@ public class LiRuntime implements SkillHost {
         int contextWindow = config.resolvedContextWindow();
         if (estimatedTokens > contextWindow * 0.8) {
             ContextCompactor.forceCompact(conversation, llmClient, contextWindow,
-                    workDir, lastAgent != null ? lastAgent.getRecoveryState() : null);
+                    workDir, lastAgent != null ? lastAgent.getRecoveryState() : null,
+                    lastAgent != null ? lastAgent.getCompactTracking() : null);
         }
 
         // Pin saved index to current conversation size so saveRecentMessages()
@@ -1327,6 +1328,6 @@ public class LiRuntime implements SkillHost {
         if (agent == null) return "No active agent to compact.";
         return ContextCompactor.forceCompact(conversation, llmClient,
                 config.resolvedContextWindow(),
-                workDir, agent.getRecoveryState());
+                workDir, agent.getRecoveryState(), agent.getCompactTracking());
     }
 }
