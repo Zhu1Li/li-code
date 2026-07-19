@@ -46,8 +46,16 @@ public class MemoryManager {
     static final Set<String> ALL_TYPES = Set.of("user", "feedback", "project", "reference", "task");
     static final int MAX_STALE_DAYS = 30;
 
+    /** Section order in MEMORY.md. A section header is how an entry's type survives a round-trip. */
+    private static final List<String> INDEX_TYPE_ORDER =
+            List.of("user", "feedback", "project", "reference", "task");
+    /** Catch-all section for entries whose type could not be recovered, so a rewrite never drops them. */
+    private static final String OTHER_SECTION = "Other";
+
     private static final Pattern FRONTMATTER_PATTERN =
             Pattern.compile("^---\\s*\\n(.*?)\\n---\\s*\\n(.*)", Pattern.DOTALL);
+    private static final Pattern TYPE_PATTERN = Pattern.compile("(?m)^\\s*type:\\s*(\\S+)\\s*$");
+    private static final Pattern UPDATED_AT_PATTERN = Pattern.compile("(?m)^\\s*updated_at:\\s*(\\S+)\\s*$");
     private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_INSTANT;
 
     // ── Fields ───────────────────────────────────────────────────────
@@ -164,7 +172,7 @@ public class MemoryManager {
         if (messages.size() < 4) return;
 
         String transcript = buildTranscript(messages);
-        String prompt = buildExtractionPrompt();
+        String prompt = buildExtractionPrompt(buildAutoMemoryBlock());
 
         // Use a side conversation with just the extraction prompt
         var sideConv = new ConversationManager();
@@ -239,9 +247,14 @@ public class MemoryManager {
         if (!Files.exists(indexFile)) return List.of();
         try {
             var entries = new ArrayList<IndexEntry>();
+            String section = null;
             for (String line : Files.readAllLines(indexFile)) {
-                IndexEntry entry = parseIndexLine(line);
-                if (entry != null) entries.add(entry);
+                if (line.startsWith("## ")) {
+                    section = parseSectionType(line);
+                    continue;
+                }
+                IndexEntry entry = parseIndexLine(line, section);
+                if (entry != null) entries.add(enrichFromFile(dir, entry));
             }
             return entries;
         } catch (IOException e) {
@@ -249,7 +262,13 @@ public class MemoryManager {
         }
     }
 
-    private IndexEntry parseIndexLine(String line) {
+    /** Recovers the type named by a {@code ## Project} style section header, or null if it names none. */
+    private static String parseSectionType(String line) {
+        String type = line.substring(3).strip().toLowerCase();
+        return ALL_TYPES.contains(type) ? type : null;
+    }
+
+    private IndexEntry parseIndexLine(String line, String type) {
         // Format: - [Title](file.md) — one-line hook (stale)
         if (!line.startsWith("- [")) return null;
         int bracketEnd = line.indexOf("](");
@@ -264,7 +283,23 @@ public class MemoryManager {
         if (emDash > 0) {
             hook = line.substring(emDash + 3).replace(" (stale)", "").strip();
         }
-        return new IndexEntry(title, fileName, hook, null, null);
+        return new IndexEntry(title, fileName, hook, type, null);
+    }
+
+    /**
+     * An index line carries no timestamp, and carries a type only via the section header it
+     * sits under, so fill both from the memory file itself. An entry with no type has no
+     * section to be written back under.
+     */
+    private IndexEntry enrichFromFile(Path dir, IndexEntry entry) {
+        String frontmatter = readFrontmatter(dir.resolve(entry.fileName));
+        if (frontmatter == null) return entry;
+        String type = entry.type;
+        if (type == null) {
+            type = firstMatch(TYPE_PATTERN, frontmatter);
+            if (type != null && !ALL_TYPES.contains(type)) type = null;
+        }
+        return new IndexEntry(entry.title, entry.fileName, entry.hook, type, extractTimestamp(frontmatter));
     }
 
     private void writeIndex(Path dir, List<IndexEntry> entries) {
@@ -272,26 +307,35 @@ public class MemoryManager {
         try {
             Files.createDirectories(dir);
             var sb = new StringBuilder();
-            // Group by type
-            for (String type : new String[]{"user", "feedback", "project", "reference", "task"}) {
-                var typed = entries.stream()
+            var remaining = new ArrayList<>(entries);
+            for (String type : INDEX_TYPE_ORDER) {
+                var typed = remaining.stream()
                         .filter(e -> type.equals(e.type))
                         .toList();
                 if (typed.isEmpty()) continue;
-                sb.append("## ").append(capitalize(type)).append("\n\n");
-                for (var e : typed) {
-                    sb.append("- [").append(e.title).append("](").append(e.fileName).append(")");
-                    if (e.hook != null && !e.hook.isEmpty()) {
-                        sb.append(" — ").append(e.hook);
-                    }
-                    sb.append('\n');
-                }
-                sb.append('\n');
+                appendIndexSection(sb, capitalize(type), typed);
+                remaining.removeAll(typed);
             }
+            // An entry whose type could not be recovered still belongs in the index —
+            // dropping it here is what used to wipe MEMORY.md on every rewrite.
+            if (!remaining.isEmpty()) appendIndexSection(sb, OTHER_SECTION, remaining);
             Files.writeString(indexFile, sb.toString().strip() + "\n");
         } catch (IOException e) {
             System.err.println("[LiCode] Memory index write error: " + e.getMessage());
         }
+    }
+
+    private void appendIndexSection(StringBuilder sb, String heading, List<IndexEntry> entries) {
+        sb.append("## ").append(heading).append("\n\n");
+        for (var e : entries) {
+            sb.append("- [").append(e.title).append("](").append(e.fileName).append(")");
+            if (e.hook != null && !e.hook.isEmpty()) {
+                sb.append(" — ").append(e.hook);
+            }
+            if (isStale(e.updatedAt)) sb.append(" (stale)");
+            sb.append('\n');
+        }
+        sb.append('\n');
     }
 
     // ── Internal: memory file I/O ────────────────────────────────────
@@ -335,20 +379,8 @@ public class MemoryManager {
                 Matcher m = FRONTMATTER_PATTERN.matcher(raw);
                 if (m.find()) {
                     String body = m.group(2).strip();
-                    // Check staleness from frontmatter
-                    String fm = m.group(1);
-                    boolean stale = false;
-                    if (fm.contains("updated_at:")) {
-                        String ts = fm.substring(fm.indexOf("updated_at:") + 12).trim();
-                        ts = ts.split("\\s")[0]; // take first token (ISO timestamp)
-                        try {
-                            Instant updated = Instant.parse(ts);
-                            long days = Duration.between(updated, Instant.now()).toDays();
-                            if (days > MAX_STALE_DAYS) stale = true;
-                        } catch (Exception ignored) {}
-                    }
                     sb.append(body.strip());
-                    if (stale) {
+                    if (isStale(extractTimestamp(m.group(1)))) {
                         sb.append("\n> This memory is over ").append(MAX_STALE_DAYS)
                           .append(" days old and may be outdated.");
                     }
@@ -365,47 +397,42 @@ public class MemoryManager {
     private void refreshStalenessFor(Path dir) {
         var entries = loadIndex(dir);
         if (entries.isEmpty()) return;
-        boolean changed = false;
-        var updated = new ArrayList<IndexEntry>();
-        Instant cutoff = Instant.now().minus(Duration.ofDays(MAX_STALE_DAYS));
+        // loadIndex re-reads each entry's timestamp from its file and writeIndex re-applies
+        // the (stale) marks, so refreshing is a load/write round-trip minus the dead files.
+        var live = entries.stream()
+                .filter(e -> Files.exists(dir.resolve(e.fileName)))
+                .toList();
+        writeIndex(dir, live);
+    }
 
-        for (var entry : entries) {
-            Path file = dir.resolve(entry.fileName);
-            try {
-                if (Files.exists(file)) {
-                    String raw = Files.readString(file);
-                    Matcher m = FRONTMATTER_PATTERN.matcher(raw);
-                    if (m.find()) {
-                        String fm = m.group(1);
-                        Instant ts = extractTimestamp(fm);
-                        IndexEntry newEntry = new IndexEntry(
-                                entry.title, entry.fileName, entry.hook, entry.type, ts
-                        );
-                        if (ts != null && ts.isBefore(cutoff)) {
-                            // Mark stale in the hook portion — hook already stripped of (stale)
-                        }
-                        updated.add(newEntry);
-                    } else {
-                        updated.add(entry);
-                    }
-                } else {
-                    changed = true; // file gone, skip entry
-                }
-            } catch (IOException e) {
-                updated.add(entry);
-            }
+    private static boolean isStale(Instant updatedAt) {
+        return updatedAt != null
+                && updatedAt.isBefore(Instant.now().minus(Duration.ofDays(MAX_STALE_DAYS)));
+    }
+
+    private String readFrontmatter(Path file) {
+        try {
+            if (!Files.exists(file)) return null;
+            Matcher m = FRONTMATTER_PATTERN.matcher(Files.readString(file));
+            return m.find() ? m.group(1) : null;
+        } catch (IOException e) {
+            return null;
         }
-        writeIndex(dir, updated);
     }
 
     private Instant extractTimestamp(String frontmatter) {
-        for (String line : frontmatter.split("\n")) {
-            if (line.contains("updated_at:")) {
-                String ts = line.substring(line.indexOf("updated_at:") + 12).trim();
-                try { return Instant.parse(ts); } catch (Exception ignored) {}
-            }
+        String ts = firstMatch(UPDATED_AT_PATTERN, frontmatter);
+        if (ts == null) return null;
+        try {
+            return Instant.parse(ts);
+        } catch (Exception ignored) {
+            return null;
         }
-        return null;
+    }
+
+    private static String firstMatch(Pattern pattern, String text) {
+        Matcher m = pattern.matcher(text);
+        return m.find() ? m.group(1) : null;
     }
 
     // ── Internal: helpers ────────────────────────────────────────────
@@ -457,13 +484,15 @@ public class MemoryManager {
         return sb.toString();
     }
 
-    private String buildExtractionPrompt() {
+    String buildExtractionPrompt(String existingMemories) {
+        String existing = existingMemories == null || existingMemories.isBlank()
+                ? "(none)" : existingMemories;
         return """
                 You are a memory curator for a coding agent. Your job is to read the conversation
                 transcript and extract NEW or UPDATED facts worth remembering for future sessions.
 
-                First, read the existing memories (if any) to avoid duplicates. Only output entries
-                that are truly new or have changed since the existing records.
+                First, read the existing memories in <existing_memories> to avoid duplicates. Only
+                output entries that are truly new or have changed since the existing records.
 
                 Output format — exactly 5 sections (skip empty ones):
 
@@ -483,7 +512,13 @@ public class MemoryManager {
                 [Cross-session task progress: what was started, where it left off, next steps]
 
                 Output nothing else. Do not repeat existing entries. Skip empty categories entirely.
-                """;
+
+                <existing_memories>
+                %s
+                </existing_memories>
+
+                Conversation transcript:
+                """.formatted(existing);
     }
 
     /**

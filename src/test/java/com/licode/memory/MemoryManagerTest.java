@@ -1,18 +1,41 @@
 package com.licode.memory;
 
 import com.licode.conversation.ConversationManager;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class MemoryManagerTest {
+
+    @TempDir
+    Path fakeHome;
+    private String realUserHome;
+
+    /**
+     * MemoryManager resolves the user-level memory dir from {@code user.home} in its
+     * constructor. Without redirecting it, these tests read — and via clear(), delete —
+     * the developer's own ~/.licode/memory.
+     */
+    @BeforeEach
+    void isolateUserHome() {
+        realUserHome = System.getProperty("user.home");
+        System.setProperty("user.home", fakeHome.toString());
+    }
+
+    @AfterEach
+    void restoreUserHome() {
+        System.setProperty("user.home", realUserHome);
+    }
 
     // ── Construction ─────────────────────────────────────────────────
 
@@ -322,6 +345,176 @@ class MemoryManagerTest {
         String block = mm.buildAutoMemoryBlock();
         // With cleared state, block should be empty
         assertEquals("", block.strip());
+    }
+
+    // ── Index round-trip ─────────────────────────────────────────────
+
+    @Test
+    void refreshStalenessKeepsEveryTypeInIndexAndBlock(@TempDir Path workDir) throws Exception {
+        MemoryManager mm = new MemoryManager(workDir);
+        mm.addManual("user prefers tabs", "user");
+        mm.addManual("licode builds with maven", "project");
+        mm.addManual("api docs on confluence", "reference");
+
+        mm.refreshStaleness();
+
+        String userIndex = Files.readString(mm.getMemoryDir("user").resolve("MEMORY.md"));
+        String projectIndex = Files.readString(mm.getMemoryDir("project").resolve("MEMORY.md"));
+        assertTrue(userIndex.contains("user prefers tabs"), "user entry dropped from index:\n" + userIndex);
+        assertTrue(projectIndex.contains("licode builds with maven"),
+                "project entry dropped from index:\n" + projectIndex);
+        assertTrue(projectIndex.contains("api docs on confluence"),
+                "reference entry dropped from index:\n" + projectIndex);
+
+        String block = mm.buildAutoMemoryBlock();
+        assertTrue(block.contains("user prefers tabs"), "user memory missing from block:\n" + block);
+        assertTrue(block.contains("licode builds with maven"), "project memory missing from block:\n" + block);
+        assertTrue(block.contains("api docs on confluence"), "reference memory missing from block:\n" + block);
+    }
+
+    @Test
+    void writingAMemoryKeepsThePreviousOnes(@TempDir Path workDir) throws Exception {
+        MemoryManager mm = new MemoryManager(workDir);
+        mm.addManual("first fact", "project");
+        mm.addManual("second fact", "reference");
+        mm.addManual("third fact", "task");
+
+        String index = Files.readString(mm.getMemoryDir("project").resolve("MEMORY.md"));
+        assertTrue(index.contains("first fact"), "earlier entry dropped on rewrite:\n" + index);
+        assertTrue(index.contains("second fact"), "earlier entry dropped on rewrite:\n" + index);
+        assertTrue(index.contains("third fact"), index);
+    }
+
+    @Test
+    void indexGroupsEntriesUnderTypeHeaders(@TempDir Path workDir) throws Exception {
+        MemoryManager mm = new MemoryManager(workDir);
+        mm.addManual("a project fact", "project");
+        mm.addManual("a reference fact", "reference");
+
+        String index = Files.readString(mm.getMemoryDir("project").resolve("MEMORY.md"));
+        assertTrue(index.contains("## Project"), index);
+        assertTrue(index.contains("## Reference"), index);
+        // The header is the only record of an entry's type, so it must survive a rewrite.
+        mm.refreshStaleness();
+        String after = Files.readString(mm.getMemoryDir("project").resolve("MEMORY.md"));
+        assertTrue(after.contains("## Project"), after);
+        assertTrue(after.contains("## Reference"), after);
+    }
+
+    @Test
+    void injectMemoriesStillWorksAfterStalenessRefresh(@TempDir Path workDir) {
+        MemoryManager mm = new MemoryManager(workDir);
+        mm.addManual("prefers small commits", "project");
+        mm.refreshStaleness();
+
+        ConversationManager conv = new ConversationManager();
+        mm.injectMemories(conv);
+        assertEquals(1, conv.getMessages().size(), "refreshStaleness must not empty the index");
+        assertTrue(conv.getMessages().get(0).getContent().contains("prefers small commits"));
+    }
+
+    /**
+     * Pins the section header as a type source on its own. The memory file has no
+     * frontmatter, so recovering the type from the file cannot rescue this entry —
+     * only the {@code ## Project} header can keep it out of the catch-all section.
+     */
+    @Test
+    void sectionHeaderAloneRecoversType(@TempDir Path workDir) throws Exception {
+        MemoryManager mm = new MemoryManager(workDir);
+        Path dir = mm.getMemoryDir("project");
+        Files.writeString(dir.resolve("legacy.md"), "a legacy memory body\n");
+        Files.writeString(dir.resolve("MEMORY.md"), "## Project\n\n- [legacy](legacy.md) — a legacy note\n");
+
+        mm.refreshStaleness();
+
+        String index = Files.readString(dir.resolve("MEMORY.md"));
+        assertTrue(index.contains("## Project"), "type not recovered from the section header:\n" + index);
+        assertTrue(index.contains("- [legacy](legacy.md) — a legacy note"), index);
+    }
+
+    /** A type we cannot recover is not a reason to drop the entry — that was the wipe. */
+    @Test
+    void entryWithUnrecoverableTypeIsKept(@TempDir Path workDir) throws Exception {
+        MemoryManager mm = new MemoryManager(workDir);
+        Path dir = mm.getMemoryDir("project");
+        Files.writeString(dir.resolve("orphan.md"), "no frontmatter, no header\n");
+        Files.writeString(dir.resolve("MEMORY.md"), "- [orphan](orphan.md) — an orphan note\n");
+
+        mm.refreshStaleness();
+
+        String index = Files.readString(dir.resolve("MEMORY.md"));
+        assertTrue(index.contains("orphan.md"), "untyped entry was dropped:\n" + index);
+        assertTrue(index.contains("an orphan note"), index);
+    }
+
+    // ── Staleness marks ──────────────────────────────────────────────
+
+    @Test
+    void oldMemoryIsMarkedStaleInIndex(@TempDir Path workDir) throws Exception {
+        MemoryManager mm = new MemoryManager(workDir);
+        mm.addManual("ancient caching decision", "project");
+        Path dir = mm.getMemoryDir("project");
+        backdate(dir.resolve("ancient-caching-decision.md"), MemoryManager.MAX_STALE_DAYS + 1);
+
+        mm.refreshStaleness();
+
+        String index = Files.readString(dir.resolve("MEMORY.md"));
+        assertTrue(index.contains("ancient caching decision (stale)"), "expected a stale mark:\n" + index);
+
+        // Re-running must not stack a second mark onto the same entry.
+        mm.refreshStaleness();
+        String again = Files.readString(dir.resolve("MEMORY.md"));
+        assertFalse(again.contains("(stale) (stale)"), "stale mark stacked on rewrite:\n" + again);
+        assertTrue(again.contains("ancient caching decision (stale)"), again);
+    }
+
+    @Test
+    void freshMemoryIsNotMarkedStale(@TempDir Path workDir) throws Exception {
+        MemoryManager mm = new MemoryManager(workDir);
+        mm.addManual("recent decision", "project");
+        mm.refreshStaleness();
+
+        String index = Files.readString(mm.getMemoryDir("project").resolve("MEMORY.md"));
+        assertFalse(index.contains("(stale)"), index);
+    }
+
+    @Test
+    void refreshStalenessDropsEntriesWhoseFileIsGone(@TempDir Path workDir) throws Exception {
+        MemoryManager mm = new MemoryManager(workDir);
+        mm.addManual("keep me", "project");
+        mm.addManual("delete me", "project");
+        Files.delete(mm.getMemoryDir("project").resolve("delete-me.md"));
+
+        mm.refreshStaleness();
+
+        String index = Files.readString(mm.getMemoryDir("project").resolve("MEMORY.md"));
+        assertTrue(index.contains("keep me"), index);
+        assertFalse(index.contains("delete me"), "index still points at a deleted file:\n" + index);
+    }
+
+    /** Rewrites a memory file's frontmatter timestamp to N days ago. */
+    private static void backdate(Path memoryFile, int daysAgo) throws Exception {
+        Instant old = Instant.now().minus(Duration.ofDays(daysAgo));
+        String body = Files.readString(memoryFile).replaceAll("updated_at: .*", "updated_at: " + old);
+        Files.writeString(memoryFile, body);
+    }
+
+    // ── Extraction prompt ────────────────────────────────────────────
+
+    @Test
+    void extractionPromptCarriesExistingMemories(@TempDir Path workDir) {
+        MemoryManager mm = new MemoryManager(workDir);
+        mm.addManual("licode targets java 21", "project");
+
+        String prompt = mm.buildExtractionPrompt(mm.buildAutoMemoryBlock());
+        assertTrue(prompt.contains("licode targets java 21"),
+                "the prompt tells the model to read existing memories, so they must be in it:\n" + prompt);
+    }
+
+    @Test
+    void extractionPromptWithoutMemoriesSaysNone(@TempDir Path workDir) {
+        MemoryManager mm = new MemoryManager(workDir);
+        assertTrue(mm.buildExtractionPrompt("").contains("(none)"));
     }
 
     // ── slugFromContent ──────────────────────────────────────────────
